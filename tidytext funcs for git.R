@@ -1,6 +1,7 @@
 require(tidyverse)
 require(tidytext)
 require(stringr)
+require(text2vec)   # for tfidf transform in the preprocessing dtm func
 
 bigram_replace <- function(text){
   
@@ -73,3 +74,46 @@ dtm_cast <- function(text){
   #  class(m)
   
   return(m) }  # dtm_cast() ends
+
+### +++ new func to preprocess n prune DTMs +++ ###
+
+require(text2vec)
+# require(tm)
+
+preprocess_dtm <- function(dtm){
+  
+  require(text2vec)
+  
+  # build tfidf wala dtm first
+  dtm_tfidf = fit_transform(dtm, TfIdf$new())
+  a0 = order(as.numeric(rownames(dtm_tfidf)))
+  dtm_tfidf = dtm_tfidf[a0,]
+  
+  # filter out irrelevant tokens based on idf colsums
+  a0 = apply(dtm_tfidf, 2, sum) %>% summary() 
+  idf_thresh = as.numeric(a0[2])
+  a1 = (a0 > idf_thresh)
+  dtm = dtm[, a1];    # dim(dtm)
+  rm(a0, a1)
+  
+  # drop tokens failing a min or max doc_occurrence threshold
+  a0 = apply(dtm, c(1,2), function(x) ifelse(x>0, 1, 0))
+  a1 = apply(a0, 2, sum);    summary(a1)
+  min_thresh = 0.01*nrow(dtm)    # drop if token occurs in < 1% of docs
+  a2 = (a1 > min_thresh)
+  a2_dtm = dtm[, a2];    # dim(a2_dtm)
+  
+  max_thresh = 0.5*nrow(dtm)     # drop if token occurs in > 50% of docs 
+  a1 = apply(a2_dtm, 2, sum)
+  a3 = (a1 <= max_thresh)
+  a3_dtm = a2_dtm[, a3];    # dim(a3_dtm) 
+            
+  # rm(a0, a1, a2, a3, a2_dtm)
+  
+  return(a3_dtm)    # pre-processed dtm output
+  
+    }  # func ends
+
+# example try
+# system.time({ nokia_dtm_processed = preprocess_dtm(nokia_dtm) })    # 1.48 secs
+# dim(nokia_dtm_processed)
