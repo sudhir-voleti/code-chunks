@@ -86,9 +86,7 @@ preprocess_dtm <- function(dtm){
   
   # build tfidf wala dtm first
   dtm_tfidf = fit_transform(dtm, TfIdf$new())
-  a0 = order(as.numeric(rownames(dtm_tfidf)))
-  dtm_tfidf = dtm_tfidf[a0,]
-  
+    
   # filter out irrelevant tokens based on idf colsums
   a0 = apply(dtm_tfidf, 2, sum) %>% summary() 
   idf_thresh = as.numeric(a0[2])
@@ -107,7 +105,8 @@ preprocess_dtm <- function(dtm){
   a1 = apply(a2_dtm, 2, sum)
   a3 = (a1 <= max_thresh)
   a3_dtm = a2_dtm[, a3];    # dim(a3_dtm) 
-            
+  a0 = order(as.numeric(rownames(a3_dtm)))
+  a3_dtm = a3_dtm[a0,]          
   # rm(a0, a1, a2, a3, a2_dtm)
   
   return(a3_dtm)    # pre-processed dtm output
