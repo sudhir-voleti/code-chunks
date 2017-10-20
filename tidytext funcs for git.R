@@ -3,7 +3,7 @@ require(tidytext)
 require(stringr)
 require(text2vec)   # for tfidf transform in the preprocessing dtm func
 
-bigram_replace <- function(text){
+bigram_replace <- function(text, min_freq = 2){
   
   require(tidyverse)
   require(tidytext)
@@ -34,7 +34,7 @@ bigram_replace <- function(text){
     dplyr::filter(!word2 %in% stop_words$word) %>%		
     
     count(word1, word2, sort = TRUE) %>%
-    filter(n > 2) %>%
+    filter(n > min_freq) %>%     # threshold kicks in here
     unite(bigram1, word1, word2, sep = " ", remove = FALSE) %>%
     unite(bigram2, word1, word2, sep = "_") 
   # bigram_df
@@ -80,7 +80,7 @@ dtm_cast <- function(text){
 require(text2vec)
 # require(tm)
 
-preprocess_dtm <- function(dtm){
+preprocess_dtm <- function(dtm, min_occur = 0.01, max_occur = 0.50){
   
   require(text2vec)
   
@@ -97,11 +97,11 @@ preprocess_dtm <- function(dtm){
   # drop tokens failing a min or max doc_occurrence threshold
   a0 = apply(dtm, c(1,2), function(x) ifelse(x>0, 1, 0))
   a1 = apply(a0, 2, sum);    summary(a1)
-  min_thresh = 0.01*nrow(dtm)    # drop if token occurs in < 1% of docs
+  min_thresh = min_occur*nrow(dtm)    # drop if token occurs in < 1% of docs
   a2 = (a1 > min_thresh)
   a2_dtm = dtm[, a2];    # dim(a2_dtm)
   
-  max_thresh = 0.5*nrow(dtm)     # drop if token occurs in > 50% of docs 
+  max_thresh = max_occur*nrow(dtm)     # drop if token occurs in > 50% of docs 
   a1 = apply(a2_dtm, 2, sum)
   a3 = (a1 <= max_thresh)
   a3_dtm = a2_dtm[, a3];    # dim(a3_dtm) 
