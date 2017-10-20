@@ -116,3 +116,99 @@ preprocess_dtm <- function(dtm, min_occur = 0.01, max_occur = 0.50){
 # example try
 # system.time({ nokia_dtm_processed = preprocess_dtm(nokia_dtm) })    # 1.48 secs
 # dim(nokia_dtm_processed)
+
+## +++  write func to do LMD fit metrics for topicmodels +++
+try(require(Rmpfr) || install.packages("Rmpfr")); library(Rmpfr)
+harmonicMean <- function(logLikelihoods, precision=2000L) {
+  
+  require(Rmpfr)
+  llMed <- median(logLikelihoods)
+  as.double(llMed - log(mean(exp(-mpfr(logLikelihoods,
+                                       prec = precision) + llMed))))
+  }    # harmonicMean() func ends
+
+LMD_fit <- function(dtm, seq_k,
+                    burnin = 1000, iter = 1000, keep = 50){
+  
+  require(topicmodels)
+  require(Rmpfr)
+  
+  # apply LDA for each k
+  fitted_many <- lapply(seq_k, 
+                        function(k) LDA(dtm, k = k, method = "Gibbs",
+                                        control = list(burnin = burnin, iter = iter, keep = keep) ))
+  
+  # extract logliks from each topic
+  logLiks_many <- lapply(fitted_many, function(L)  L@logLiks[-c(1:(burnin/keep))])
+  
+  # compute harmonic means
+  hm_many <- sapply(logLiks_many, function(h) harmonicMean(h))
+  
+  return(hm_many)
+  }   # LMD_fit() func ends
+
+# downstream analyses for above LMD func
+# plot(seq_k1, hm_many1, type = "l", xlab = "num_topics", ylab = "Log Marginal Density")
+# seq_k1[which.max(hm_many1)]    # compute optimum number of topics                    
+
+## +++ Want to try perplexity based fit as a func? +++ ##
+# func to compute perplexity scores for both trg & validn samples
+perpl_fit <- function(train_set, valid_set, k,
+                      burnin = 1000, iter = 1000, keep = 50){
+  
+  require(topicmodels)
+  # define fitted model below
+  fitted <- topicmodels::LDA(train_set, 
+                             k = k, method = "Gibbs",
+                             control = list(burnin = burnin, iter = iter, keep = keep))
+  
+  a0 = topicmodels::perplexity(fitted, newdata = as.matrix(train_set)) # about 567
+  a1 = topicmodels::perplexity(fitted, newdata = as.matrix(valid_set)) # about 928
+  
+  return(list(a0, a1))
+  
+} # perpl_fit() func ends
+
+# func for perplexity calcs in m-fold cross-validn setting, for seq_k
+perpl_cv_mfold <- function(dtm, folds = 5, seq_k){
+  
+  # build df to store perplexity results in	
+  num_topic = rep(seq_k, folds)
+  fold_num = NULL; for (i1 in 1:folds){fold_num = c(fold_num, rep(i1, length(seq_k)))}	
+  trg_perpl = c(0)
+  test_perpl = c(0)
+  store_df = data.frame(num_topic, fold_num, trg_perpl, test_perpl)
+  
+  # split data into cross-validated trg n test samples
+  splitfolds <- sample(1:folds, nrow(dtm), replace = TRUE)
+  for(i in 1:folds){
+    train_set <- dtm[splitfolds != i , ]
+    valid_set <- dtm[splitfolds == i, ]
+    
+    a00 = lapply(seq_k, function(k) 
+    {perpl_fit(train_set, valid_set, k)})
+    
+    a01 = matrix(unlist(a00), length(a00), 2, byrow=TRUE)
+    a02 = (store_df$fold_num == i) 				
+    store_df$trg_perpl[a02] = a01[, 1]
+    store_df$test_perpl[a02] = a01[, 2]
+    
+    cat(i, "\n")		
+    
+  } # i loop ends
+  
+  # ggplotting the results
+  ggplot(store_df, aes(x = num_topic, y = test_perpl)) +
+    geom_point() +
+    geom_smooth(se = FALSE) +
+    
+    ggtitle("5-fold cross-validation of topic modelling with the Nokia dataset",
+            "(ie 5 different models fit for each candidate number of topics)") +
+    
+    labs(x = "Candidate number of topics", y = "Perplexity when fitting the trained model to the hold-out set")
+  
+  
+  return(store_df)
+  
+} # perpl_cv_mfold() func ends
+                    
