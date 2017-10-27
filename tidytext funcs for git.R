@@ -79,7 +79,7 @@ dtm_cast <- function(text){
   #  class(m)
 
   # reorder dtm to have sorted rows by doc_num and cols by colsums	
-  m = m[order(as.numeric(rownames(m)),]    # reorder rows	
+  m = m[order(as.numeric(rownames(m))),]    # reorder rows	
   b0 = apply(m, 2, sum) %>% order(decreasing = TRUE)
   m = m[, b0]; rm(b0)	      
 	      
