@@ -77,7 +77,12 @@ dtm_cast <- function(text){
   m <- textdf1 %>%
     cast_sparse(doc, word, n)
   #  class(m)
-  
+
+  # reorder dtm to have sorted rows by doc_num and cols by colsums	
+  m = m[order(as.numeric(rownames(m)),]    # reorder rows	
+  b0 = apply(m, 2, sum) %>% order(decreasing = TRUE)
+  m = m[, b0]; rm(b0)	      
+	      
   return(m) }  # dtm_cast() ends
 
 ### +++ new func to preprocess n prune DTMs +++ ###
