@@ -4,13 +4,15 @@ require(stringr)
 require(text2vec)   # for tfidf transform in the preprocessing dtm func
 
 # +++ defining a purely clean_text op
-clean_text <- function(text){  
+clean_text <- function(text, lower=FALSE, alphanum=FALSE){
   text  =  str_replace_all(text, "<.*?>", " ")   # drop html junk
   text = text %>%   
-    str_to_lower %>% 	# make text lower case
-    # str_replace_all("[^[:alnum:]]", " ") %>%  # remove non-alphanumeric symbols
-    str_replace_all("\\\\s+", " ")  # collapse multiple spaces  
-	}  # clean_text() ends
+    str_replace_all("\\\\s+", " ")  # collapse multiple spaces
+  
+  if (lower=="TRUE") {text = text %>% str_to_lower()}
+  if (alphanum=="TRUE") {text = text %>% str_replace_all("[^[:alnum:]]", " ")}
+  
+  return(text)    }  # clean_text() ends
 
 # +++
 bigram_replace <- function(text, min_freq = 2){
@@ -18,19 +20,11 @@ bigram_replace <- function(text, min_freq = 2){
   require(tidyverse)
   require(tidytext)
   require(stringr)
-  
- ## basic cleaning exercises
- # text  =  str_replace_all(text, "<.*?>", " ")   # drop html junk
- # text = text %>%   # v cool. mke this part of std cleanup procs in text-an
- # str_to_lower %>% # make text lower case
- # str_replace_all("[^[:alnum:]]", " ") %>%  # remove non-alphanumeric symbols
- # str_replace_all("\\\\s+", " ")  # collapse multiple spaces
-  
+   
   ## drop particular stop_words from raw text corpus - of , the, at, 
   # stop1 = apply(as.data.frame(stop_words$word), 1, function(x) paste0(" ", x, " "))   # overly long. Pointless
   stop2 = c(" of ", " the ", " at ")    # get rid of connectors inside proper-noun strings
 
-  # for (i1 in 1:length(stop2)){ text = gsub(stop2[i1], " ", text) }
   b0 = sapply(stop2, function(x) {text = str_replace_all(text, x, " ")});   rm(b0)
   
   ## now build bigrams list
@@ -53,11 +47,7 @@ bigram_replace <- function(text, min_freq = 2){
   if (nrow(bigram_df) > 0) { 
 	b0 = sapply(bigram_df$bigram1, function(x) {text = str_replace_all(text, x, str_replace(x, " ", "_"))})
 	} else {text = text};    rm(b0)	
-
- #  for (i1 in 1:nrow(bigram_df)){ 
- #    text = gsub(bigram_df$bigram1[i1], bigram_df$bigram2[i1], text) }
-  
-  # output processed corpus
+	
   return(text)	
   
 } # bigram_replace() ends
