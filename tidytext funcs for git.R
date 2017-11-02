@@ -3,19 +3,28 @@ require(tidytext)
 require(stringr)
 require(text2vec)   # for tfidf transform in the preprocessing dtm func
 
+# +++ defining a purely clean_text op
+clean_text <- function(text){  
+  text  =  str_replace_all(text, "<.*?>", " ")   # drop html junk
+  text = text %>%   
+    str_to_lower %>% 	# make text lower case
+    # str_replace_all("[^[:alnum:]]", " ") %>%  # remove non-alphanumeric symbols
+    str_replace_all("\\\\s+", " ")  # collapse multiple spaces  
+	}  # clean_text() ends
+
+# +++
 bigram_replace <- function(text, min_freq = 2){
   
   require(tidyverse)
   require(tidytext)
   require(stringr)
   
-    ## basic cleaning exercises
-  text  =  str_replace_all(text, "<.*?>", " ")   # drop html junk
-  
-  text = text %>%   # v cool. mke this part of std cleanup procs in text-an
-    str_to_lower %>% # make text lower case
-    #      str_replace_all("[^[:alnum:]]", " ") %>%  # remove non-alphanumeric symbols
-    str_replace_all("\\\\s+", " ")  # collapse multiple spaces
+ ## basic cleaning exercises
+ # text  =  str_replace_all(text, "<.*?>", " ")   # drop html junk
+ # text = text %>%   # v cool. mke this part of std cleanup procs in text-an
+ # str_to_lower %>% # make text lower case
+ # str_replace_all("[^[:alnum:]]", " ") %>%  # remove non-alphanumeric symbols
+ # str_replace_all("\\\\s+", " ")  # collapse multiple spaces
   
   ## drop particular stop_words from raw text corpus - of , the, at, 
   # stop1 = apply(as.data.frame(stop_words$word), 1, function(x) paste0(" ", x, " "))   # overly long. Pointless
