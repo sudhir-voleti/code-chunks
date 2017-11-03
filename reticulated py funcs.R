@@ -108,7 +108,7 @@ py.annotate <- function(corpus, ner = FALSE){
     text_list = lapply(clean_corpus, function(x) {py.postag(x)})}
   
   for (doc in 1:length(text_list)){ text_list[[doc]]$doc_num = doc    }
-  text_df = bind_rows(pgp_list)
-  text_annotated_df = pgp_df %>% postag_desc()
+  text_df = bind_rows(text_list)
+  text_annotated_df = text_df %>% postag_desc()
   
   return(text_annotated_df) }    # py.annotate() func ends
