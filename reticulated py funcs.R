@@ -2,9 +2,12 @@
 
 try(require(reticulate)|| install.packages("reticulate"))
 library(reticulate) 
+library(stringr)
 
 # defining a purely clean_text op
 clean_text <- function(text, lower=FALSE, alphanum=FALSE){
+  
+  require(stringr)
   text  =  str_replace_all(text, "<.*?>", " ")   # drop html junk
   text = text %>%   
     # str_to_lower %>% 	# make text lower case
@@ -90,3 +93,22 @@ py.lemmatize <- function(text){
   colnames(a0) = c("original", "lemmatized")
   
   return(a0)     }   # py.lemmatize() func ends
+
+## Func 5: One func to bind them all.
+
+# create master func to link through py funcs 1-3 for corpus inputs
+py.annotate <- function(corpus, ner = FALSE){
+  
+  require(reticulate)
+  nltk = import("nltk")   # Import nltk
+  
+  clean_corpus = clean_text(corpus)
+  
+  if (ner == "TRUE") {text_list = lapply(clean_corpus, function(x) {py.ner(x)})} else { 
+    text_list = lapply(clean_corpus, function(x) {py.postag(x)})}
+  
+  for (doc in 1:length(text_list)){ text_list[[doc]]$doc_num = doc    }
+  text_df = bind_rows(pgp_list)
+  text_annotated_df = pgp_df %>% postag_desc()
+  
+  return(text_annotated_df) }    # py.annotate() func ends
