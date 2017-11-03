@@ -3,6 +3,7 @@
 try(require(reticulate)|| install.packages("reticulate"))
 library(reticulate) 
 library(stringr)
+require(tidyverse)
 
 # defining a purely clean_text op
 clean_text <- function(text, lower=FALSE, alphanum=FALSE){
@@ -112,3 +113,64 @@ py.annotate <- function(corpus, ner = FALSE){
   text_annotated_df = text_df %>% postag_desc()
   
   return(text_annotated_df) }    # py.annotate() func ends
+
+### +++ Build [noun | verb] phrase detector (& later, extractor) func
+
+# defining phrase components
+verb_phrase = c("RB", "RBR", "RBS", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "PRP", "PRP$")
+noun_phrase = c("JJ", "JJR", "JJS", "NN", "NNP", "NNS", "NNPS")
+
+phrase_detector <- function(doc_df, noun=TRUE){   # one document in df form
+  
+  if (noun == "FALSE"){phrase_compts = verb_phrase} else {phrase_compts = noun_phrase}
+  
+  serial_num = seq(1:nrow(doc_df))
+  phrase_index = rep(0, nrow(doc_df))
+  doc_df1 = data.frame(serial_num, phrase_index, doc_df)
+  logical_vec = (doc_df$pos_tag %in% phrase_compts)
+  doc_df_subsetted = doc_df1[logical_vec,]
+  # head(doc_df_subsetted, 10)
+  
+  # drop all rows with F-T-F pattern
+  n1 = nrow(doc_df_subsetted)
+  try(if(n1 < 2) stop("not enough df rows"))
+  if (n1 > 5) { 
+    current = doc_df_subsetted$serial_num
+    before = c(0, doc_df_subsetted$serial_num[1:(n1-1)])  
+    after = c(doc_df_subsetted$serial_num[2:n1], 0)
+    drop = ((current - before) != 1)*((after-current) != 1); # sum(drop)
+    
+    doc_df_subsetted = doc_df_subsetted[(!drop),]
+    # head(doc_df_subsetted, 15)
+  } # if ends
+  
+  try(if(nrow(doc_df_subsetted) <3) stop("not enough df rows"))
+  if(nrow(doc_df_subsetted) <3)  {b0 = NULL} else {
+    
+    # build loop for detecting phrases    
+    index = 1
+    for (i1 in 2:nrow(doc_df_subsetted)){
+      if ((doc_df_subsetted$serial_num[i1] - doc_df_subsetted$serial_num[i1-1]) == 1) {
+        doc_df_subsetted$phrase_index[i1] = index;  
+        doc_df_subsetted$phrase_index[i1-1] = index} else {index = index+1}
+    } # i1 loop ends
+    
+    # paste0(doc_df_subsetted$token[(doc_df_subsetted$phrase_index == 2)], collapse = " ")  
+    
+    b0 = sapply(seq(2:max(doc_df_subsetted$phrase_index)),
+                function(x) {
+                  paste0(doc_df_subsetted$token[(doc_df_subsetted$phrase_index == x)], collapse = " ") }) # 0.02 secs
+    
+  } # else ends
+  
+  return(b0)    } # phrase_detector() func ends
+
+## build a corpus-level wrapper func around phrase-detector()
+extract_phrases <- function(corpus_df, noun=TRUE){   # output from py.annotate()
+
+    corpus_split_list = split(corpus_df, corpus_df$doc_num)
+  
+  if (noun == "FALSE"){phrase_list = lapply(corpus_split_list, function(x) {phrase_detector(x, noun=FALSE)})} else 
+  {phrase_list = lapply(corpus_split_list, function(x) {phrase_detector(x)})}  
+  
+  return(phrase_list)    }   # extract_phrases() func ends
