@@ -2,6 +2,7 @@ require(tidyverse)
 require(tidytext)
 require(stringr)
 require(text2vec)   # for tfidf transform in the preprocessing dtm func
+require(Matrix)	  # in dtm_merge() func to bind sparse matricies
 
 # +++ defining a purely clean_text op
 clean_text <- function(text, lower=FALSE, alphanum=FALSE){
@@ -125,6 +126,63 @@ preprocess_dtm <- function(dtm, min_occur = 0.01, max_occur = 0.50){
 # example try
 # system.time({ nokia_dtm_processed = preprocess_dtm(nokia_dtm) })    # 1.48 secs
 # dim(nokia_dtm_processed)
+	     
+## === func to merge DTMs (needed when iterating) === ##
+dtm_merge <- function(dtm1, dtm2){
+require(Matrix)	
+colnames1 = colnames(dtm1)	
+colnames2 = colnames(dtm2)
+
+# first merge cols that do match b/w both DTMs
+union_cols = intersect(colnames1, colnames2)
+	a00 = (colnames(dtm1) %in% union_cols)
+	dtm1_union = dtm1[, a00]
+
+	a01 = (colnames(dtm2) %in% union_cols)
+	dtm2_union = dtm2[, a01]
+
+	# reorder colnames to make colnames identical
+	a02 = order(colnames(dtm1_union))
+	a03 = order(colnames(dtm2_union))
+
+	dtm1_union = dtm1_union[, a02]	
+	dtm2_union = dtm2_union[, a03]	
+
+if (identical(colnames(dtm1_union), colnames(dtm2_union))) { 
+	merged_dtm = rbind(dtm1_union, dtm2_union) } else {cat("colnames mismatch b/w DTMs")}
+
+# divide non-intersecting portion of merged_dtm into 4 quadrants starting top-left clockwise: 2 & 4 being zero matrices
+unique_cols = setdiff(unique(c(colnames1, colnames2)), intersect(colnames1, colnames2))
+	a00 = (colnames(dtm1) %in% unique_cols)    
+	dtm1_unique = dtm1[, a00]	# quadrant 1 ready
+	quad_4 = Matrix(0, nrow=nrow(dtm2), 
+			ncol=ncol(dtm1_unique), sparse=TRUE) 	# quadrant 4 ready
+
+	a01 = (colnames(dtm2) %in% unique_cols)
+	dtm2_unique = dtm2[, a01]	# quadrant 3 ready
+	quad_2 = Matrix(0, nrow=nrow(dtm1), 
+			ncol=ncol(dtm2_unique), sparse=TRUE) 	# quadrant 2 ready
+
+	colnames(quad_4) = colnames(dtm1_unique)
+	rownames(quad_4) = rownames(dtm2_unique)
+	colnames(quad_2) = colnames(dtm2_unique)
+	rownames(quad_2) = rownames(dtm1_unique)
+
+# start binding the pieces together now ...
+quad_14 = rbind(dtm1_unique, quad_4)
+quad_23 = rbind(quad_2, dtm2_unique)
+
+merged_dtm = cbind(merged_dtm, quad_14, quad_23) # dtm1_unique, quad_2)  # worx.
+
+	return(merged_dtm) 	} # dtm_merge() func ends
+
+# testing above func on nokia data
+# nokia = readLines('https://github.com/sudhir-voleti/sample-data-sets/raw/master/text%20analysis%20data/amazon%20nokia%20lumia%20reviews.txt')
+# nokia1 = sample(nokia[1:60], 25);    nokia2 = sample(nokia[61:120], 25)
+# dtm1 = nokia1 %>% clean_text(lower=TRUE, alphanum=TRUE) %>%  bigram_replace() %>% dtm_cast()
+# dtm2 = nokia2 %>% clean_text(lower=TRUE, alphanum=TRUE) %>% bigram_replace() %>% dtm_cast()
+# system.time({ nokia_merged_dtm = dtm_merge(dtm1, dtm2) })    # 0.08 secs
+	     
 
 ## +++  write func to do LMD fit metrics for topicmodels +++
 try(require(Rmpfr) || install.packages("Rmpfr")); library(Rmpfr)
@@ -221,3 +279,5 @@ perpl_cv_mfold <- function(dtm, folds = 5, seq_k){
   
 } # perpl_cv_mfold() func ends
                     
+
+		    
