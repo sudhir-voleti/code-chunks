@@ -6,19 +6,18 @@ library(stringr)
 require(tidyverse)
 
 # defining a purely clean_text op
-clean_text <- function(text, lower=FALSE, alphanum=FALSE){
-  
-  require(stringr)
+clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
   text  =  str_replace_all(text, "<.*?>", " ")   # drop html junk
-  text = text %>%   
-    # str_to_lower %>% 	# make text lower case
-    # str_replace_all("[^[:alnum:]]", " ") %>%  # remove non-alphanumeric symbols
-    str_replace_all("\\\\s+", " ")  # collapse multiple spaces
-  
+ 
   if (lower=="TRUE") {text = text %>% str_to_lower()}
   if (alphanum=="TRUE") {text = text %>% str_replace_all("[^[:alnum:]]", " ")}
-  
-  return(text)    }  # clean_text() ends
+  if (drop_num=="TRUE") {text = text %>% str_replace_all("[:digit:]", "")}
+
+ # collapse multiple spaces
+  text = text %>%   
+    str_replace_all("\\\\s+", " ")  
+
+  return(text) } # clean_text() ends
 
 ### Func 1: write an R func to POSTag with py
 py.postag <- function(text){
@@ -241,3 +240,42 @@ extract_entity <- function(corpus,
 # example is below, commented out based on ibm corpus
 # text_df = py.annotate(ibm_corpus, ner = TRUE); ibm_orgs_list = extract_entity(text_df, entity = "ORGANIZATION") 
 ###      
+
+### === Reticulate an R func to snowball.stem a dtm's colnames ===
+py.dtm_stemmer <- function(dtm1){
+
+ tokens = colnames(dtm1)
+ require(reticulate)
+ nltk = import("nltk")   # import nltk
+ snowb_stemmer = nltk.stem$SnowballStemmer   # from nltk.stem.snowball import SnowballStemmer
+ # snowb_stemmer('english')$stem('technologies') # example
+ b0 = sapply(tokens, snowb_stemmer('english')$stem)    # 2.44 secs for 11k tokens
+
+ ## deconstruct the dtm and reassemble later
+ b1 = mapply(identical, b0, colnames(dtm1))   # see ?mapply 
+ dtm1_preserve = dtm1[, b1]    # 1k x 4412
+ dtm1_old = dtm1[, (!b1)]    # 1k x 6597
+ 
+ b2 = setdiff(b0, colnames(dtm1))   # asymm set difference
+ dtm1_new = dtm1[,1:length(b2)] 
+ colnames(dtm1_new) = NULL
+
+ for (i1 in 1:length(b2)){
+    b00 = which((b0 == b2[i1]))
+    dtm1_new[, i1] = apply(as.matrix(dtm1[,b00]), 1, sum)
+    if ((i1 %% 100) == 0) { cat(i1, "\n")}
+	 }    # hah.
+
+ colnames(dtm1_new) = b2
+ 
+ dtm2 = cbind(dtm1_preserve, dtm1_new)
+
+ return(dtm2)    }     # func ends
+
+# try on nokia dataset
+# dtm_nokia = nokia %>% clean_text(lower=TRUE, alphanum=TRUE) %>% bigram_replace() %>%
+#		dtm_cast() %>% preprocess_dtm()  # 1.65 secs
+# dim(dtm_nokia)    # 120x443
+# dtm_nokia = py.dtm_stemmer(dtm_nokia)   # 0.55 secs
+# dim(dtm_nokia)    # 120x400. ~10% drop
+      
