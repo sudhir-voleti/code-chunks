@@ -259,14 +259,16 @@ py.dtm_stemmer <- function(dtm1){
  b2 = setdiff(b0, colnames(dtm1))   # asymm set difference
  dtm1_new = dtm1[,1:length(b2)] 
  colnames(dtm1_new) = NULL
-
+ b3 = vector(length=length(b2), mode="list")
+	
  for (i1 in 1:length(b2)){
     b00 = which((b0 == b2[i1]))
     dtm1_new[, i1] = apply(as.matrix(dtm1[,b00]), 1, sum)
+    b3[i1] = colnames(dtm1)[b00[1]]		 
     if ((i1 %% 100) == 0) { cat(i1, "\n")}
 	 }    # hah.
 
- colnames(dtm1_new) = b2
+ colnames(dtm1_new) = b3
  
  dtm2 = cbind(dtm1_preserve, dtm1_new)
 
