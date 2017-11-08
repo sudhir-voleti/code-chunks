@@ -5,15 +5,18 @@ require(text2vec)   # for tfidf transform in the preprocessing dtm func
 require(Matrix)	  # in dtm_merge() func to bind sparse matricies
 
 # +++ defining a purely clean_text op
-clean_text <- function(text, lower=FALSE, alphanum=FALSE){
+clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
   text  =  str_replace_all(text, "<.*?>", " ")   # drop html junk
-  text = text %>%   
-    str_replace_all("\\\\s+", " ")  # collapse multiple spaces
-  
+ 
   if (lower=="TRUE") {text = text %>% str_to_lower()}
   if (alphanum=="TRUE") {text = text %>% str_replace_all("[^[:alnum:]]", " ")}
-  
-  return(text)    }  # clean_text() ends
+  if (drop_num=="TRUE") {text = text %>% str_replace_all("[:digit:]", "")}
+
+ # collapse multiple spaces
+  text = text %>%   
+    str_replace_all("\\\\s+", " ")  
+
+  return(text) } # clean_text() ends
 
 # +++
 bigram_replace <- function(text, min_freq = 2){
