@@ -247,6 +247,7 @@ py.dtm_stemmer <- function(dtm1){
  tokens = colnames(dtm1)
  require(reticulate)
  nltk = import("nltk")   # import nltk
+ nltk.stem = nltk$stem	
  snowb_stemmer = nltk.stem$SnowballStemmer   # from nltk.stem.snowball import SnowballStemmer
  # snowb_stemmer('english')$stem('technologies') # example
  b0 = sapply(tokens, snowb_stemmer('english')$stem)    # 2.44 secs for 11k tokens
