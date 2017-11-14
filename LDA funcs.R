@@ -175,11 +175,11 @@ show_wordcloud <- function(input_df){   # first colm is words, next is freq
 #     show_wordcloud(top_tokens_list[[16]])   # <2 secs
 
 # building input for show_cog()
-tokens = as.character(top_tokens_list[[16]]$top_tokens)
-dtm1=readRDS("E:\\R miscell\\dtm1.Rds")
-cols=colnames(dtm1)
-a0 = (cols %in% tokens); sum(a0)
-dtm1_subset = dtm1[, a0]; dim(dtm1_subset)
+#tokens = as.character(top_tokens_list[[16]]$top_tokens)
+#dtm1=readRDS("E:\\R miscell\\dtm1.Rds")
+#cols=colnames(dtm1)
+#a0 = (cols %in% tokens); sum(a0)
+#dtm1_subset = dtm1[, a0]; dim(dtm1_subset)
 
 # == general cog builder func that we'll invoke later ==
 build_cog <- function(dtm1, # input DTM
