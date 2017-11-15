@@ -241,7 +241,7 @@ build_cog <- function(dtm1, # input DTM
 }   # build_cog(dtm) func ends
 
 
-# == wrapper func around build_cog() ==
+## == wrapper func around build_cog() ==
 show_cog <- function(tokens_list,  # tokens_list is outp from top_n_tokens() for n>=100
                      topic_k = 1, # choose which topic number to show  
                      dtm1,   # input full dtm in
@@ -265,7 +265,7 @@ show_cog <- function(tokens_list,  # tokens_list is outp from top_n_tokens() for
 # show_cog(top_tokens_list, topic_k=8, dtm1, title="COG for topic 8")
 # system.time({ show_cog(top_tokens_list, topic_k=18, dtm1, title="COG for topic 18") }) # 0.09 secs
 
-# build an iterator func over corpora ==
+## === build an iterator func over corpora === ##
 iterator_seq <- function(corpus, bite_size = 50){
   if (class(corpus) != "data.frame") {corpus = data_frame(corpus)} 
   iter_seq = seq(from = 1, to = (nrow(corpus)+1), by = bite_size)      
@@ -278,29 +278,33 @@ iterator_seq <- function(corpus, bite_size = 50){
   
   return(iter_seq)    }   # corpus_iterator() func ends
 
-## === Build show_trajectory() func ===
+## === Build a show_trajectory() func? ===
 
 ## == defining pre-req funcs for show_movements func ==
 
 ## calc_dist() func for a given firm
 calc_dist <- function(dtm_subset, cumul=FALSE){
   dist_mat = matrix(0, nrow=nrow(dtm_subset), ncol=1)
+  # evaluate cumul condn
   if (cumul == "TRUE") {
     for (i2 in 2:nrow(dist_mat)){ dist_mat[i2,1] = sqrt(sum((dtm_subset[i2,]-dtm_subset[(i2-1),])^2)) +  dist_mat[(i2-1),1] }
-    colnames(dist_mat) = "cumul_distance"	} else {
+    colnames(dist_mat) = "cumul_distance"	
+  } else {
       for (i2 in 2:nrow(dist_mat)){ dist_mat[i2,1] = sqrt(sum((dtm_subset[i2,]-dtm_subset[(i2-1),])^2)) }
-      colnames(dist_mat) = "total_distance" }
-  return(dist_mat) }    # func ends
+      colnames(dist_mat) = "total_distance" } # else ends
+return(dist_mat) }    # func ends
 
 ## calc_disp() func for a given firm
 calc_disp <- function(dtm_subset){
   disp_mat = matrix(0, nrow=nrow(dtm_subset), ncol=1)
   for (i2 in 2:nrow(disp_mat)){ disp_mat[i2,1] = sqrt(sum((dtm_subset[i2,]-dtm_subset[1,])^2))  }
   colnames(disp_mat) = "net_displacement"
-  return(disp_mat) }    # func ends
+return(disp_mat) }    # func ends
 
-## func to extract firm indices of interest
-show_firm_indices <- function(firm_name1="yahoo "){ which(str_detect(firm_detail$firm_name, firm_name1)) }
+## specialized func to extract firm indices of interest
+show_firm_indices <- function(firm_name1="yahoo ", 
+                              firm_detail){  # df with colm firm_name and year
+  which(str_detect(firm_detail$firm_name, firm_name1)) } # func ends
 
 ## multiplot() needed for below
 # http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/
@@ -344,6 +348,7 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 ## === building a show_movements() func for any focal firms list ===
 show_movements <- function(firms_sample=firms_sample,   # list of firms to see movements for
                            firm_names_short=NULL,   # since partial matching can net different firms
+                           firm_detail=firm_detail,   # df with colm firm_name and year
                            by_variable=FALSE){
   
   require(ggplot2)
@@ -353,7 +358,7 @@ show_movements <- function(firms_sample=firms_sample,   # list of firms to see m
   # define empty vector for master-df
   df0 = data.frame(year=factor(), firm = character(), variable=character(), value=numeric(), stringsAsFactors=FALSE) 
   
-  a02 = lapply(firms_sample, function(x){show_firm_indices(x)}); # a02[[2]]
+  a02 = lapply(firms_sample, function(x){show_firm_indices(x, firm_detail)}); # a02[[2]]
   
   for (i1 in 1:length(a02)){
     year = firm_detail[a02[[i1]], 1] 
