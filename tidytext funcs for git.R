@@ -19,7 +19,7 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
   return(text) } # clean_text() ends
 
 # +++
-bigram_replace <- function(text, min_freq = 2){
+replace_bigram <- function(text, min_freq = 2){
   
   require(tidyverse)
   require(tidytext)
@@ -54,11 +54,11 @@ bigram_replace <- function(text, min_freq = 2){
 	
   return(text)	
   
-} # bigram_replace() ends
+} # replace_bigram() ends
 
 ### +++ new func to cast DTMs outta processed corpora +++ ###
 
-dtm_cast <- function(text){
+dtm_cast <- function(text){   # text is corpus; tidytext::cast_dtm() is already taken
   
   ## basic cleaning exercises
   text  =  gsub("<.*?>", " ", text)	# drop html junk
@@ -131,7 +131,7 @@ preprocess_dtm <- function(dtm, min_occur = 0.01, max_occur = 0.50){
 # dim(nokia_dtm_processed)
 	     
 ## === func to merge DTMs (needed when iterating) === ##
-dtm_merge <- function(dtm1, dtm2){
+merge_dtm <- function(dtm1, dtm2){
 require(Matrix)	
 colnames1 = colnames(dtm1)	
 colnames2 = colnames(dtm2)
@@ -177,110 +177,11 @@ quad_23 = rbind(quad_2, dtm2_unique)
 
 merged_dtm = cbind(merged_dtm, quad_14, quad_23) # dtm1_unique, quad_2)  # worx.
 
-	return(merged_dtm) 	} # dtm_merge() func ends
+	return(merged_dtm) 	} # merge_dtm() func ends
 
 # testing above func on nokia data
 # nokia = readLines('https://github.com/sudhir-voleti/sample-data-sets/raw/master/text%20analysis%20data/amazon%20nokia%20lumia%20reviews.txt')
 # nokia1 = sample(nokia[1:60], 25);    nokia2 = sample(nokia[61:120], 25)
 # dtm1 = nokia1 %>% clean_text(lower=TRUE, alphanum=TRUE) %>%  bigram_replace() %>% dtm_cast()
 # dtm2 = nokia2 %>% clean_text(lower=TRUE, alphanum=TRUE) %>% bigram_replace() %>% dtm_cast()
-# system.time({ nokia_merged_dtm = dtm_merge(dtm1, dtm2) })    # 0.08 secs
-	     
-
-## +++  write func to do LMD fit metrics for topicmodels +++
-try(require(Rmpfr) || install.packages("Rmpfr")); library(Rmpfr)
-harmonicMean <- function(logLikelihoods, precision=2000L) {
-  
-  require(Rmpfr)
-  llMed <- median(logLikelihoods)
-  as.double(llMed - log(mean(exp(-mpfr(logLikelihoods,
-                                       prec = precision) + llMed))))
-  }    # harmonicMean() func ends
-
-LMD_fit <- function(dtm, seq_k,
-                    burnin = 1000, iter = 1000, keep = 50){
-  
-  require(topicmodels)
-  require(Rmpfr)
-  
-  # apply LDA for each k
-  fitted_many <- lapply(seq_k, 
-                        function(k) LDA(dtm, k = k, method = "Gibbs",
-                                        control = list(burnin = burnin, iter = iter, keep = keep) ))
-  
-  # extract logliks from each topic
-  logLiks_many <- lapply(fitted_many, function(L)  L@logLiks[-c(1:(burnin/keep))])
-  
-  # compute harmonic means
-  hm_many <- sapply(logLiks_many, function(h) harmonicMean(h))
-  
-  return(hm_many)
-  }   # LMD_fit() func ends
-
-# downstream analyses for above LMD func
-# plot(seq_k1, hm_many1, type = "l", xlab = "num_topics", ylab = "Log Marginal Density")
-# seq_k1[which.max(hm_many1)]    # compute optimum number of topics                    
-
-## +++ Want to try perplexity based fit as a func? +++ ##
-# func to compute perplexity scores for both trg & validn samples
-perpl_fit <- function(train_set, valid_set, k,
-                      burnin = 1000, iter = 1000, keep = 50){
-  
-  require(topicmodels)
-  # define fitted model below
-  fitted <- topicmodels::LDA(train_set, 
-                             k = k, method = "Gibbs",
-                             control = list(burnin = burnin, iter = iter, keep = keep))
-  
-  a0 = topicmodels::perplexity(fitted, newdata = as.matrix(train_set)) # about 567
-  a1 = topicmodels::perplexity(fitted, newdata = as.matrix(valid_set)) # about 928
-  
-  return(list(a0, a1))
-  
-} # perpl_fit() func ends
-
-# func for perplexity calcs in m-fold cross-validn setting, for seq_k
-perpl_cv_mfold <- function(dtm, folds = 5, seq_k){
-  
-  # build df to store perplexity results in	
-  num_topic = rep(seq_k, folds)
-  fold_num = NULL; for (i1 in 1:folds){fold_num = c(fold_num, rep(i1, length(seq_k)))}	
-  trg_perpl = c(0)
-  test_perpl = c(0)
-  store_df = data.frame(num_topic, fold_num, trg_perpl, test_perpl)
-  
-  # split data into cross-validated trg n test samples
-  splitfolds <- sample(1:folds, nrow(dtm), replace = TRUE)
-  for(i in 1:folds){
-    train_set <- dtm[splitfolds != i , ]
-    valid_set <- dtm[splitfolds == i, ]
-    
-    a00 = lapply(seq_k, function(k) 
-    {perpl_fit(train_set, valid_set, k)})
-    
-    a01 = matrix(unlist(a00), length(a00), 2, byrow=TRUE)
-    a02 = (store_df$fold_num == i) 				
-    store_df$trg_perpl[a02] = a01[, 1]
-    store_df$test_perpl[a02] = a01[, 2]
-    
-    cat(i, "\n")		
-    
-  } # i loop ends
-  
-  # ggplotting the results
-  ggplot(store_df, aes(x = num_topic, y = test_perpl)) +
-    geom_point() +
-    geom_smooth(se = FALSE) +
-    
-    ggtitle("5-fold cross-validation of topic modelling with the Nokia dataset",
-            "(ie 5 different models fit for each candidate number of topics)") +
-    
-    labs(x = "Candidate number of topics", y = "Perplexity when fitting the trained model to the hold-out set")
-  
-  
-  return(store_df)
-  
-} # perpl_cv_mfold() func ends
-                    
-
-		    
+# system.time({ nokia_merged_dtm = merge_dtm(dtm1, dtm2) })    # 0.08 secs	     
