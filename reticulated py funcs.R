@@ -21,6 +21,10 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
 
 ### Func 1: write an R func to POSTag with py
 py.postag <- function(text){
+	
+# If py.annotate fails, goto CMD prompt & type the following (using #0 as line break)
+#0 python  #0 import nltk  #0 nltk.download()
+# In the open downloader window, download 'punkt' for 'Punkt tokenizer models', 'average perceptron tagger', etc.
   
   require(reticulate)
   
@@ -115,7 +119,9 @@ py.annotate <- function(corpus, ner = FALSE){
 
 ### +++ Build [noun | verb] phrase detector (& later, extractor) func
 
-phrase_detector <- function(doc_df, noun=TRUE){   # one document in df form
+phrase_detector <- function(doc_df, noun=TRUE){   # one annotated document in df form
+	
+  if (!("pos_tag" %in% colnames(doc_df))) {doc_df = py.annotate(doc_df)}	
   
   # defining phrase components
   verb_phrase = c("RB", "RBR", "RBS", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "PRP", "PRP$")
@@ -167,6 +173,7 @@ phrase_detector <- function(doc_df, noun=TRUE){   # one document in df form
 ## build a corpus-level wrapper func around phrase-detector()
 extract_phrases <- function(corpus_df, noun=TRUE){   # output from py.annotate()
 
+    if (!("pos_tag" %in% colnames(corpus_df))) {corpus_df = py.annotate(corpus_df)}	
     corpus_split_list = split(corpus_df, corpus_df$doc_num)
   
   if (noun == "FALSE"){phrase_list = lapply(corpus_split_list, function(x) {phrase_detector(x, noun=FALSE)})} else 
