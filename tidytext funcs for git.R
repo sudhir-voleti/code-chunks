@@ -185,3 +185,60 @@ merged_dtm = cbind(merged_dtm, quad_14, quad_23) # dtm1_unique, quad_2)  # worx.
 # dtm1 = nokia1 %>% clean_text(lower=TRUE, alphanum=TRUE) %>%  bigram_replace() %>% dtm_cast()
 # dtm2 = nokia2 %>% clean_text(lower=TRUE, alphanum=TRUE) %>% bigram_replace() %>% dtm_cast()
 # system.time({ nokia_merged_dtm = merge_dtm(dtm1, dtm2) })    # 0.08 secs	     
+
+## === funcs tying in above funcs with iterators for large corpora ===
+## dtm-builder-seq func
+dtm_seq <- function(text, lower1=TRUE, alphanum1=TRUE,
+                    min_occur1=0.02, max_occur1=0.75){
+  
+  dtm1 = text %>% clean_text(lower=lower1, alphanum=alphanum1) %>%  
+    replace_bigram() %>% dtm_cast() %>% 
+    preprocess_dtm(min_occur=min_occur1, max_occur=max_occur1)
+  
+    return(dtm1)}   # dtm_seq() func ends
+
+## build an iterator func
+iterate <- function(files, bite_size = 50){
+  
+  n1 = length(files)
+  seq1 = seq(from=1, to=n1, by=bite_size)
+  n2 = length(seq1)
+  if (n1 > max(seq1)){ if ((n1 - max(seq1)) < 0.5*bite_size) {seq1[n2] = n1} else {
+    seq1 = c(seq1, n1+1);  n2 = length(seq1) }}
+  
+  start = seq1[1:(n2-1)]
+  stop = seq1[2:n2]-1; 
+  stop[(n2-1)]=n1
+  df1 = data.frame(start, stop); df1
+  
+  outp_list = vector(mode="list", length=(n2-1))
+  for (i1 in 1:(n2-1)){ outp_list[[i1]] = files[df1$start[i1]:df1$stop[i1]] }
+  return(outp_list)    }    # func ends. Yields a list output of iterated data shards
+
+## build iterated dtm builder func
+build_dtm_iterated <- function(text_col, bite_size1 = 25,   # iterate defaults
+                               lower1=TRUE, alphanum1=TRUE, # dtm_seq defaults
+                               min_occur1=0.02, max_occur1=0.75){    # preprocess_dtm defaults
+  
+  outp_list = iterate(text_col, bite_size=bite_size1) # 0.03 secs for 1k docs
+  # text_col = filt_bigrm_corp$chunk
+  
+  # system.time({ dtm_list = lapply(outp_list, dtm_seq) })   # takes way too long.
+  dtm_list = vector(mode = "list", length = length(outp_list))
+  for (i2 in 1:length(dtm_list)){
+    dtm_list[[i2]] = dtm_seq(outp_list[[i2]], 
+                             lower=lower1, alphanum=alphanum1,
+                             min_occur1, max_occur1)    # dtm_seq() func used with defaults
+    
+    cat("Processed list element no. ", i2,"\n")  }  # t < 214 secs
+  
+  dtm1 = dtm_list[[1]]
+  for (i1 in 2:length(dtm_list)){ dtm1 = merge_dtm(dtm1, dtm_list[[i1]])  } # 1.12 secs
+  dtm1 = preprocess_dtm(dtm1, min_occur=min_occur1, max_occur=max_occur1) # 21 secs
+  return(dtm1)    }    # build_dtm_iterated() func ends
+
+## trial above on Nokia before uploading to git
+# nokia = readLines('https://github.com/sudhir-voleti/sample-data-sets/raw/master/text%20analysis%20data/amazon%20nokia%20lumia%20reviews.txt')
+# dtm_nokia = build_dtm_iterated(nokia, bite_size=15)   # 0.89 secs
+	     
+	     
