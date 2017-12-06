@@ -115,12 +115,12 @@ py.annotate <- function(corpus, ner = FALSE){
 
 ### +++ Build [noun | verb] phrase detector (& later, extractor) func
 
-# defining phrase components
-verb_phrase = c("RB", "RBR", "RBS", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "PRP", "PRP$")
-noun_phrase = c("JJ", "JJR", "JJS", "NN", "NNP", "NNS", "NNPS")
-
 phrase_detector <- function(doc_df, noun=TRUE){   # one document in df form
   
+  # defining phrase components
+  verb_phrase = c("RB", "RBR", "RBS", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "PRP", "PRP$")
+  noun_phrase = c("JJ", "JJR", "JJS", "NN", "NNP", "NNS", "NNPS")
+	
   if (noun == "FALSE"){phrase_compts = verb_phrase} else {phrase_compts = noun_phrase}
   
   serial_num = seq(1:nrow(doc_df))
