@@ -242,3 +242,47 @@ build_dtm_iterated <- function(text_col, bite_size1 = 25,   # iterate defaults
 # dtm_nokia = build_dtm_iterated(nokia, bite_size=15)   # 0.89 secs
 	     
 	     
+
+concordance.r <- function(text1,  # corpus
+                          word1,  # focal word for whcih context is sought
+                          k){     # context window length in words on either side
+  
+  require(magrittr)
+  require(tidytext)
+  require(dplyr)
+  require(tidyr)
+  
+  text1 = gsub('<.*?>', "", text1)   # drop html junk
+  
+  text_df <- data_frame(text1) %>% 
+    unnest_tokens(word, text1) %>% 
+    
+    # build an index for word positions in the corpus
+    mutate(index = 1) %>% mutate(wordnum = 1:sum(index)) %>% dplyr::select(-index) #%>%
+  
+  text_df
+  
+  # locate context words for each instance of the focal word
+  a0 = which(text_df$word == word1)
+  a1 = matrix(0, nrow = length(a0), ncol = 3)
+  colnames(a1) = c("start", "focal", "stop")
+  for (i1 in 1:nrow(a1)){a1[i1, 1] = max(0, a0[i1]-k) 
+  a1[i1, 2] = a0[i1]
+  a1[i1, 3] = min(nrow(text_df), a0[i1]+k)  }
+  head(a1)
+  
+  require(stringi)
+  # creat a list to store the contexts or concordances of word1  
+  list0 = vector("list", length = length(a0))
+  for (i2 in 1:length(list0)){
+    list0[[i2]] = stri_join(text_df$word[a1[i2,1]:a1[i2, 3]], collapse=" ") 
+    list0[[i2]] = gsub(word1, paste0('*', word1, '*', collapse=""), list0[[i2]])   # gsub(pattern, replacement, x)
+  } # i2 ends
+  list0[[2]]
+  
+  # read list into dataframe for easier display of output  
+  list_df = data.frame(NULL)
+  for (i2 in 1:length(a0)){list_df[i2,1] = list0[[i2]]}
+  colnames(list_df) = 'concordance'
+  
+return(list_df) } # func ends
