@@ -3,6 +3,8 @@ require(tidytext)
 require(stringr)
 require(text2vec)   # for tfidf transform in the preprocessing dtm func
 require(Matrix)	  # in dtm_merge() func to bind sparse matricies
+library(widyr)   # for pairwise_count() func in building tidy based cogs
+library(ggraph)  # for tidy based cogs
 
 # +++ defining a purely clean_text op
 clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
@@ -286,3 +288,57 @@ concordance.r <- function(text1,  # corpus
   colnames(list_df) = 'concordance'
   
 return(list_df) } # func ends
+	     
+# +++
+	     
+## build quick func for the same:
+build_cog_ggraph <- function(corpus,   # text colmn only
+				max_edges = 150, 
+				drop.stop_words=TRUE,
+				new.stopwords=NULL){
+
+  # invoke libraries
+  library(tidyverse)
+  library(tidytext)
+  library(widyr)
+  library(ggraph)
+
+  # build df from corpus
+  corpus_df = data.frame(docID = seq(1:length(corpus)), text = corpus, stringsAsFactors=FALSE)
+
+  # eval stopwords condn
+  if (drop.stop_words == TRUE) {stop.words = unique(c(stop_words$word, new.stopwords)) %>% 
+						as_tibble() %>% rename(word=value)} else {stop.words = stop_words[2,]}
+
+  # build word-pairs
+  word_pairs <- corpus_df %>% 
+
+			# tokenize, drop stop_words etc
+			unnest_tokens(word, text) %>% anti_join(stop.words) %>%
+
+			# pairwise_count() counts #token-pairs co-occuring in docs
+	  		pairwise_count(word, docID, sort = TRUE, upper = FALSE) # %>% # head()
+
+ row_thresh = min(nrow(word_pairs), max_edges)
+
+ # now plot
+ set.seed(1234)
+ # windows()
+ plot_obj <- word_pairs %>%
+ 		   filter(n >= 3) %>%
+		   top_n(row_thresh) %>%
+
+		   igraph::graph_from_data_frame() %>%   # graph object built!
+
+		   ggraph(layout = "fr") +
+		   geom_edge_link(aes(edge_alpha = n, edge_width = n), edge_colour = "cyan4") +
+		   geom_node_point(size = 5) +
+		   geom_node_text(aes(label = name), repel = TRUE, 
+	                 point.padding = unit(0.2, "lines")) +
+		  theme_void()
+
+ return(plot_obj)    # must return func output
+
+ }  # func ends
+
+	     
