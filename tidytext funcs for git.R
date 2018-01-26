@@ -340,5 +340,7 @@ build_cog_ggraph <- function(corpus,   # text colmn only
  return(plot_obj)    # must return func output
 
  }  # func ends
-
 	     
+# quick example for above func. uncomment & run.
+# speech = readLines('https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/PM%20speech%202014.txt')
+# b0 = build_cog_ggraph(speech); b0    # < 1 second	     
