@@ -60,35 +60,53 @@ replace_bigram <- function(text, min_freq = 2){
 
 ### +++ new func to cast DTMs outta processed corpora +++ ###
 
-dtm_cast <- function(text){   # text is corpus; tidytext::cast_dtm() is already taken
-  
-  ## basic cleaning exercises
+casting_dtm <- function(text,    	 # text is raw corpus 
+			tfidf=FALSE,     
+			use.stopwords=TRUE,    # whether to use stopwords at all 
+			additional.stopwords=NULL){    # which additional stopwords to add
+
+  ## basic cleaning exercises. Obviates need for clean_text()
   text  =  gsub("<.*?>", " ", text)	# drop html junk
-  
   text = text %>%   	# v cool. mke this part of std cleanup procs in text-an
     str_to_lower %>% # make text lower case
-    #      str_replace_all("[^[:alnum:]]", " ") %>%  # remove non-alphanumeric symbols but removes sentence delimiters too
     str_replace_all("\\s+", " ")  	 # collapse multiple spaces
-  
-  textdf = data_frame(text)
-  textdf1 = textdf %>%
-    mutate(doc = row_number()) %>%    # row_number() is v useful.
-    group_by(doc) %>%
+
+  ## tokenizing the corpus
+   textdf = data_frame(text)
+   textdf1 = textdf %>%
+    mutate(docID = row_number()) %>%    # row_number() is v useful.
+    group_by(docID) %>%
     unnest_tokens(word, text) %>%
-    anti_join(stop_words) %>%
-    count(word, sort = TRUE)
-  
-  # cast into a Matrix object
-  m <- textdf1 %>%
-    cast_sparse(doc, word, n)
+    count(word, sort = TRUE) %>% ungroup()
+
+  ## make stop.words list
+   stop.words = data.frame(word = as.character(unique(c(additional.stopwords, stop_words$word))),
+				stringsAsFactors=FALSE)	
+
+    if (use.stopwords == "TRUE"){ textdf1 = textdf1 %>% anti_join(stop.words) }
+
+  ## cast into a Matrix object
+  if (tfidf == "TRUE") {
+	textdf2 = textdf1 %>% group_by(docID) %>% 
+		count(word, sort=TRUE) %>% ungroup() %>%
+		bind_tf_idf(word, docID, nn) %>% 
+		rename(value = tf_idf)} else { textdf2 = textdf1 %>% rename(value = n)  }
+
+  m <- textdf2 %>% cast_sparse(docID, word, value)
   #  class(m)
 
   # reorder dtm to have sorted rows by doc_num and cols by colsums	
   m = m[order(as.numeric(rownames(m))),]    # reorder rows	
   b0 = apply(m, 2, sum) %>% order(decreasing = TRUE)
-  m = m[, b0]; rm(b0)	      
-	      
-  return(m) }  # dtm_cast() ends
+  m = m[, b0]
+
+  return(m) }  # func casting_dtm() ends
+
+ # testing the func
+  # speech = readLines('https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/PM%20speech%202014.txt')
+  # system.time({ speech_dtm_tf = speech %>% casting_dtm() })    # 0.05 secs
+  # system.time({ speech_dtm_idf = speech %>% casting_dtm(tfidf=TRUE) })   # 0.07 secs 
+
 
 ### +++ new func to preprocess n prune DTMs +++ ###
 
