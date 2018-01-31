@@ -58,6 +58,19 @@ replace_bigram <- function(text, min_freq = 2){
   
 } # replace_bigram() ends
 
+ ## === small pipe-able routine to clean DTMs of empty rows/colms ===
+ nonempty_dtm <- function(dtm){
+
+	# drop empty rows from dtm
+	a100 = apply(dtm, 1, sum); a101 = (a100 == 0)
+		dtm = dtm[!(a101), ]
+
+	# dropempty colms from dtm
+	a200 = apply(dtm, 2, sum); a201 = (a200 == 0)
+		dtm = dtm[, !(a201)]
+
+  return(dtm) }
+
 ### +++ new func to cast DTMs outta processed corpora +++ ###
 
 casting_dtm <- function(text,    	 # text is raw corpus 
