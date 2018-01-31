@@ -322,56 +322,65 @@ return(list_df) } # func ends
 	     
 # +++
 	     
-## build quick func for the same:
+## tidytext based wordcloud + COG combo
 build_cog_ggraph <- function(corpus,   # text colmn only
-				max_edges = 150, 
-				drop.stop_words=TRUE,
-				new.stopwords=NULL){
-
+                             max_edges = 150, 
+                             drop.stop_words=TRUE,
+                             new.stopwords=NULL){
+  
   # invoke libraries
   library(tidyverse)
   library(tidytext)
   library(widyr)
   library(ggraph)
-
+  library(igraph)
+  
   # build df from corpus
   corpus_df = data.frame(docID = seq(1:length(corpus)), text = corpus, stringsAsFactors=FALSE)
-
+  
   # eval stopwords condn
   if (drop.stop_words == TRUE) {stop.words = unique(c(stop_words$word, new.stopwords)) %>% 
-						as_tibble() %>% rename(word=value)} else {stop.words = stop_words[2,]}
-
+    as_tibble() %>% rename(word=value)} else {stop.words = stop_words[2,]}
+  
   # build word-pairs
-  word_pairs <- corpus_df %>% 
+  tokens <- corpus_df %>% 
+    
+    # tokenize, drop stop_words etc
+    unnest_tokens(word, text) %>% anti_join(stop.words)
+    
+    # pairwise_count() counts #token-pairs co-occuring in docs
+  word_pairs = tokens %>% pairwise_count(word, docID, sort = TRUE, upper = FALSE)# %>% # head()
+  
+  word_counts = tokens %>% count( word,sort = T) %>% dplyr::rename( wordfr = n)
+  
+  word_pairs = word_pairs %>% left_join(word_counts, by = c("item1" = "word"))
+  
+  row_thresh = min(nrow(word_pairs), max_edges)
+  
+  # now plot
+  set.seed(1234)
+  # windows()
+  plot_d <- word_pairs %>%
+    filter(n >= 3) %>%
+    top_n(row_thresh) %>%   igraph::graph_from_data_frame() 
+  
+  dfwordcloud = data_frame(vertices = names(V(plot_d))) %>% left_join(word_counts, by = c("vertices"= "word"))
+  
+  plot_obj = plot_d %>%   # graph object built!
+    
+    ggraph(layout = "fr") +
+    geom_edge_link(aes(edge_alpha = n, edge_width = n), edge_colour = "cyan4")  +
+    # geom_node_point(size = 5) +
+    geom_node_point(size = log(dfwordcloud$wordfr)) +
+    geom_node_text(aes(label = name), repel = TRUE, 
+                   point.padding = unit(0.2, "lines"),
+                   size = 1 + log(dfwordcloud$wordfr)) +
+    theme_void()
+  
+  return(plot_obj)    # must return func output
+  
+}  # func ends
 
-			# tokenize, drop stop_words etc
-			unnest_tokens(word, text) %>% anti_join(stop.words) %>%
-
-			# pairwise_count() counts #token-pairs co-occuring in docs
-	  		pairwise_count(word, docID, sort = TRUE, upper = FALSE) # %>% # head()
-
- row_thresh = min(nrow(word_pairs), max_edges)
-
- # now plot
- set.seed(1234)
- # windows()
- plot_obj <- word_pairs %>%
- 		   filter(n >= 3) %>%
-		   top_n(row_thresh) %>%
-
-		   igraph::graph_from_data_frame() %>%   # graph object built!
-
-		   ggraph(layout = "fr") +
-		   geom_edge_link(aes(edge_alpha = n, edge_width = n), edge_colour = "cyan4") +
-		   geom_node_point(size = 5) +
-		   geom_node_text(aes(label = name), repel = TRUE, 
-	                 point.padding = unit(0.2, "lines")) +
-		  theme_void()
-
- return(plot_obj)    # must return func output
-
- }  # func ends
-	     
 # quick example for above func. uncomment & run.
 # speech = readLines('https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/PM%20speech%202014.txt')
-# b0 = build_cog_ggraph(speech); b0    # < 1 second	     
+# b0 = build_cog_ggraph(speech); b0    # < 1 second
