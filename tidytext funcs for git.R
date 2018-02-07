@@ -31,7 +31,7 @@ replace_bigram <- function(text, min_freq = 2){
   # stop1 = apply(as.data.frame(stop_words$word), 1, function(x) paste0(" ", x, " "))   # overly long. Pointless
   stop2 = c(" of ", " the ", " at ")    # get rid of connectors inside proper-noun strings
 
-  b0 = sapply(stop2, function(x) {text = str_replace_all(text, x, " ")});   rm(b0)
+  b0 = sapply(stop2, function(x) {text = str_replace_all(text, x, " ")});   # rm(b0)
   
   ## now build bigrams list
   textdf = data_frame(text)	# convert to tibble
@@ -52,7 +52,7 @@ replace_bigram <- function(text, min_freq = 2){
   ## replace bigrams with single tokens
   if (nrow(bigram_df) > 0) { 
 	b0 = sapply(bigram_df$bigram1, function(x) {text = str_replace_all(text, x, str_replace(x, " ", "_"))})
-	} else {text = text};    rm(b0)	
+	} else {text = text};    # rm(b0)	
 	
   return(text)	
   
