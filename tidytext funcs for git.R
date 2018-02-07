@@ -22,27 +22,25 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
 
 # +++
 ## == brew fast func to build bigrams.
- replace_bigram <- function(raw_corpus, min_freq = 2){
+ replace_bigram <- function(corpus, min_freq = 2){  # corpus has 1 unnamed character colm
 
  library(tidyverse)
  library(tidytext)
  library(stringr)
   
   # first filter out stopwords - c("of ", "the ", " and").
-   clean_corpus = raw_corpus %>% data_frame() %>% rename(text=".") %>%
+   corpus_df = corpus %>% data_frame() %>% rename(text=".") %>%
 			mutate( text = str_replace_all(text, " of ", " "),
 				text = str_replace_all(text, " and ", " "),
 				text = str_replace_all(text, " [Tt]he ", " "),
 				text = str_replace_all(text, "\\\\s+", "\\s"))
 
-
-  textdf = data.frame(docID=seq(1:length(raw_corpus)), text=clean_corpus, stringsAsFactors=FALSE)
+  textdf = data.frame(docID=seq(1:nrow(corpus_df)), text=corpus, stringsAsFactors=FALSE)
 
   # Unnesting bigrams
   a0 = textdf %>% 	
 	 # bigram-tokenize, count and filter by freq
 	 unnest_tokens(ngram, text, token = "ngrams", n = 2) 
-
    a0
 
    # creating frequent bigrams for replacement
@@ -100,9 +98,12 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
   for (i2 in a201){
     a200 = a2[a2$docID == i2,] 	
     doc_corpus[i2, 1] = a200$docID[1]	
-    doc_corpus[i2, 2] = str_c(a200$bigram1, collapse=" ")    }    # i2 ends
+    doc_corpus[i2, 2] = str_c(a200$bigram1, collapse=" ")
+
+    if (i2 %% 1000 == 0) {cat(i2, " docs processed\n")}
+    }    # i2 ends
  
-  return(doc_corpus) }    # replace_bigrams() func ends 
+  return(doc_corpus) }
 
  # testing above on speech data
  # speech = readLines('https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/PM%20speech%202014.txt')
