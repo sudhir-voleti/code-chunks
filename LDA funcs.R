@@ -143,6 +143,7 @@ top_n_docs <- function(Gibbs, n=15, doc_names=NULL){
   if (class(Gibbs) != "LDA_Gibbs") {stop("Error - Wrong Input. Not an LDA object")}
   
   gamma = slot(Gibbs, "gamma")    # matrix obj of posterior topic distribution for each document
+  if (is.null(rownames(gamma))) {rownames(gamma) = seq(1:nrow(gamma))}
   if (is.null(doc_names)) {doc_names=rownames(gamma)} else {rownames(gamma) = doc_names}
   
   # now populate list with top_n tokens
