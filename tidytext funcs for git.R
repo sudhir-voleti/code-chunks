@@ -21,21 +21,53 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
   return(text) } # clean_text() ends
 
 # +++
-replace_bigram <- function(text, min_freq = 2){
+
+## define collect_terms() routine for calling inside replace_bigrams()
+  collect_terms <- function(a21){  # sentence has colms {docID, sentID, word1, word2, bigram1, out_colm}
+
+	b100 = (is.na(a21$bigram1))
+	a21$bigram1[b100] = a21$word1[b100]
+
+	a21$word2[!(b100)] = ""
+	bigram2 = c(a21$bigram1[2:nrow(a21)], a21$word2[nrow(a21)]); bigram2
+
+	bigram2 = c(a21$word1[1], bigram2[1:(length(bigram2)-2)], 
+				paste(bigram2[nrow(a21)-1], a21$word2[nrow(a21)], sep=" ")); bigram2
+
+	bigram2[!(b100)] = a21$bigram1[!(b100)]; bigram2
+	
+	if (length(bigram2)>0) { a21$out_colm = bigram2[1:length(a21$out_colm)] } else {
+		a21$out_colm = a21$bigram1 }
+
+  return(a21)  }
+
+## == replace bigrams wala 'efficient' func
+replace_bigram <- function(raw_corpus, min_freq = 2){
   
   require(tidyverse)
   require(tidytext)
   require(stringr)
-   
+  
+  text = raw_corpus	
   ## drop particular stop_words from raw text corpus - of , the, at, 
   # stop1 = apply(as.data.frame(stop_words$word), 1, function(x) paste0(" ", x, " "))   # overly long. Pointless
-  stop2 = c(" of ", " the ", " at ")    # get rid of connectors inside proper-noun strings
-
-  b0 = sapply(stop2, function(x) {text = str_replace_all(text, x, " ")});   # rm(b0)
+  # stop2 = c(" of ", " the ", " at ")    # get rid of connectors inside proper-noun strings
+  textdf =  text %>% data.frame(docID=seq(1:length(text)), text=text, stringsAsFactors=FALSE) %>%
+	        select(docID, text) %>% 
+		mutate(text = str_replace_all(text, " of ", " "),
+		      text = str_replace_all(text, " and ", " "),
+		      text = str_replace_all(text, " [Tt]he ", " "),
+		      text = str_replace_all(text, "\\\\s+", "\\s"))	
+				
   
   ## now build bigrams list
-  textdf = data_frame(text)	# convert to tibble
-  
+  a0 = textdf %>% 
+	# bigram-tokenize, count and filter by freq
+	group_by(docID) %>% 
+	unnest_tokens(ngram, text, token = "ngrams", n = 2) %>% 
+	ungroup() 
+   a0
+	
   bigram_df <- textdf %>%
     unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
     separate(bigram, c("word1", "word2"), sep = " ") %>%
@@ -45,18 +77,40 @@ replace_bigram <- function(text, min_freq = 2){
     
     count(word1, word2, sort = TRUE) %>%
     filter(n > min_freq) %>%     # threshold kicks in here
-    unite(bigram1, word1, word2, sep = " ", remove = FALSE) %>%
-    unite(bigram2, word1, word2, sep = "_") 
-  # bigram_df
-  
-  ## replace bigrams with single tokens
-  if (nrow(bigram_df) > 0) { 
-	b0 = sapply(bigram_df$bigram1, function(x) {text = str_replace_all(text, x, str_replace(x, " ", "_"))})
-	} else {text = text};    # rm(b0)	
+    unite(ngram, word1, word2, sep = " ", remove = FALSE) %>%
+    unite(bigram1, word1, word2, sep = "_") %>% select(-n)
 	
-  return(text)	
+  bigram_df
   
-} # replace_bigram() ends
+  # merging the 2 above dfs
+  a2 = left_join(a0, bigram_df, by=c("ngram" = "ngram")) %>%
+	 separate(ngram, c("word1", "word2"), sep=" ", remove=FALSE) %>%
+	 mutate(out_colm = bigram1) %>%
+	 select(-ngram) 
+  a2
+ 
+ ## trying for loop directly on docID for collect_terms() 
+  list_out1 = vector(mode="list", length=length(max(a2$docID)))
+      a201 = unique(a2$docID)  # coz not all docs are in sequence
+
+  for (i1 in a201){ list_out1[[i1]] = a2[a2$docID == i1,] }
+  list_out2 = lapply(list_out1, function(x) {if (length(x) > 0) {collect_terms(x)}})
+  a3 = bind_rows(list_out2)
+  
+   b0 = which(is.na(a3$docID))
+   if (length(b0)>0) {a3 = a3[-b0,]}
+
+  a3
+
+## rebuilding corpus, now at doc layer
+  doc_corpus = data.frame(docID = numeric(), text = character(), stringsAsFactors=FALSE)
+  for (i2 in a201){
+    a200 = a3[a3$docID == i2,] 	
+    doc_corpus[i2, 1] = a200$docID[1]	
+    doc_corpus[i2, 2] = str_c(a200$out_colm, collapse=" ")    }    # i2 ends
+ 
+  return(doc_corpus) }    # replace_bigrams() func ends	
+ 
 
  ## === small pipe-able routine to clean DTMs of empty rows/colms ===
  nonempty_dtm <- function(dtm){
