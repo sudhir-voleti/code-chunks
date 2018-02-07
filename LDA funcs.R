@@ -76,25 +76,28 @@ perpl_cv_mfold <- function(dtm, folds = 5, seq_k){
     store_df$trg_perpl[a02] = a01[, 1]
     store_df$test_perpl[a02] = a01[, 2]
     
-    cat(i, "\n")		
-    
-  } # i loop ends
+    cat(i, "\n")		  } # i loop ends
   
-  # ggplotting the results
-  ggplot(store_df, aes(x = num_topic, y = test_perpl)) +
-    geom_point() +
-    geom_smooth(se = FALSE) +
-    
-    ggtitle("5-fold cross-validation of topic modelling with the Nokia dataset",
-            "(ie 5 different models fit for each candidate number of topics)") +
-    
-    labs(x = "Candidate number of topics", y = "Perplexity when fitting the trained model to the hold-out set")
-  
-  
-  return(store_df)
-  
-} # perpl_cv_mfold() func ends
+  return(store_df)  } # perpl_cv_mfold() func ends
 
+  # ggplotting the results of perpl_cv_mfold()
+ plot_perpl_fit <- function(store_df){
+   
+   plot1 = ggplot(store_df, aes(x = num_topic, y = test_perpl)) +
+      geom_point() +
+      geom_smooth(se = FALSE) +
+    
+      ggtitle("5-fold cross-validation of topic modelling with the Nokia dataset",
+            "(ie 5 different models fit for each candidate number of topics)") +   
+   
+      labs(x = "Candidate number of topics", y = "Perplexity when fitting the trained model to the hold-out set")   
+   }  # func ends
+  
+  # example vignette of how to run and view                 
+  # see_plot = perpl_cv_mfold(dtm) %>% plot_perpl_fit; see_plot          
+
+                    
+                    
 ## === Analysing the LTM output objects ===
 
 ## func to extract top loading tokens per topic
