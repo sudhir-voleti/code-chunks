@@ -21,57 +21,95 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
   return(text) } # clean_text() ends
 
 # +++
-replace_bigram <- function(text, min_freq = 2){
-  
-  require(tidyverse)
-  require(tidytext)
-  require(stringr)
-   
-  ## drop particular stop_words from raw text corpus - of , the, at, 
-  # stop1 = apply(as.data.frame(stop_words$word), 1, function(x) paste0(" ", x, " "))   # overly long. Pointless
-  stop2 = c(" of ", " the ", " at ")    # get rid of connectors inside proper-noun strings
+## == brew fast func to build bigrams.
+ replace_bigram <- function(raw_corpus, min_freq = 2){
 
-  b0 = sapply(stop2, function(x) {text = str_replace_all(text, x, " ")});   # rm(b0)
+ library(tidyverse)
+ library(tidytext)
+ library(stringr)
   
-  ## now build bigrams list
-  textdf = data_frame(text)	# convert to tibble
+  # first filter out stopwords - c("of ", "the ", " and").
+   clean_corpus = raw_corpus %>% data_frame() %>% rename(text=".") %>%
+			mutate( text = str_replace_all(text, " of ", " "),
+				text = str_replace_all(text, " and ", " "),
+				text = str_replace_all(text, " [Tt]he ", " "),
+				text = str_replace_all(text, "\\\\s+", "\\s"))
+
+
+  textdf = data.frame(docID=seq(1:length(raw_corpus)), text=clean_corpus, stringsAsFactors=FALSE)
+
+  # Unnesting bigrams
+  a0 = textdf %>% 	
+	 # bigram-tokenize, count and filter by freq
+	 unnest_tokens(ngram, text, token = "ngrams", n = 2) 
+
+   a0
+
+   # creating frequent bigrams for replacement
+   a1 = a0 %>% 
+	   count(ngram, sort=TRUE) %>% filter(n >= min_freq) %>% 
+	   separate(ngram, c("word1", "word2"), sep=" ", remove=FALSE) %>% 
+
+		# drop all stopwords in the bigrams of interest
+    		dplyr::filter(!word1 %in% stop_words$word) %>%
+		dplyr::filter(!word2 %in% stop_words$word) %>%
+	   	
+	   unite(bigram1, c("word1", "word2"), sep="_")	 %>% 
+	   dplyr::select(ngram, bigram1)    # dplyr:: coz MASS also has select()
+   a1
+	 
+  # merging the 2 above dfs
+  a2 = left_join(a0, a1, by=c("ngram" = "ngram")) %>%
+	 separate(ngram, c("word1", "word2"), sep=" ", remove=FALSE) %>%
+	 dplyr::select(-ngram) # %>% mutate(out_colm = bigram1)
+  a2
+
+  # using colm-logicals to solve repeats wala problem
+  a400 = (is.na(a2$bigram1))
+    a400a = which(!a400)   # orig bigram locations
+    a2$bigram1[a400] = a2$word1[a400]
+    a2
   
-  bigram_df <- textdf %>%
-    unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
-    separate(bigram, c("word1", "word2"), sep = " ") %>%
-    
-    dplyr::filter(!word1 %in% stop_words$word) %>%
-    dplyr::filter(!word2 %in% stop_words$word) %>%
-    
-    count(word1, word2, sort = TRUE) %>%
-    filter(n > min_freq) %>%     # threshold kicks in here
-    unite(bigram1, word1, word2, sep = " ", remove = FALSE) %>%
-    unite(bigram2, word1, word2, sep = "_") 
-  # bigram_df
-  
-  ## replace bigrams with single tokens
-  if (nrow(bigram_df) > 0) { 
-	b0 = sapply(bigram_df$bigram1, function(x) {text = str_replace_all(text, x, str_replace(x, " ", "_"))})
-	} else {text = text};    # rm(b0)	
+  a401 = which(!a400)  
+  a402 = a401 + 1
+	if (max(a402) > nrow(a2)) { a402[length(a402)] = nrow(a2) }
+
+  a403 = (a2$docID[a401] == a2$docID[a402])   # is bigram inside the document (or at its boundary)?
+
+  # what if there are consecutive bigrams?  
+  a403a = (a403)*(!(a402 %in% a401))  
+
+  a404 = a402*a403a
+  a405 = a404[(a404 > 0)]  # these are the extra terms or repeats to be dropped.
+
+  a2$bigram1[a405] = ""
+
+  # using colm-logicals to solve last-word-dropoff wala problem
+  a500 = a2$docID
+    a501 = c(a500[2:length(a500)], a500[length(a500)])	
+    a502 = which(a500 != a501)    # docID boundaries
+    a503 = !(a502 %in% a400a)   # these are the ones to insert
+    a503a = a502[a503]    
+
+    a2$bigram1[a503a] = paste(a2$bigram1[a503a], a2$word2[a503a])
 	
-  return(text)	
-  
-} # replace_bigram() ends
+  # rebuilding corpus, now at doc layer
+  doc_corpus = data.frame(docID = numeric(), text = character(), stringsAsFactors=FALSE)
+  a201 = unique(a2$docID)
 
- ## === small pipe-able routine to clean DTMs of empty rows/colms ===
- nonempty_dtm <- function(dtm){
+  for (i2 in a201){
+    a200 = a2[a2$docID == i2,] 	
+    doc_corpus[i2, 1] = a200$docID[1]	
+    doc_corpus[i2, 2] = str_c(a200$bigram1, collapse=" ")    }    # i2 ends
+ 
+  return(doc_corpus) }    # replace_bigrams() func ends 
 
-	# drop empty rows from dtm
-	a100 = apply(dtm, 1, sum); a101 = (a100 == 0)
-		dtm = dtm[!(a101), ]
+ # testing above on speech data
+ # speech = readLines('https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/PM%20speech%202014.txt')
+ # system.time({ bigrammed_corpus = replace_bigram(speech, min_freq = 2) }) # 0.66 secs
+ # bigrammed_corpus[1:5,]
 
-	# dropempty colms from dtm
-	a200 = apply(dtm, 2, sum); a201 = (a200 == 0)
-		dtm = dtm[, !(a201)]
-
-  return(dtm) }
-
-### +++ new func to cast DTMs outta processed corpora +++ ###
+ ### +++ new func to cast DTMs outta processed corpora +++ ###
 
 casting_dtm <- function(text,    	 # text is raw corpus 
 			tfidf=FALSE,     
@@ -120,6 +158,18 @@ casting_dtm <- function(text,    	 # text is raw corpus
   # system.time({ speech_dtm_tf = speech %>% casting_dtm() })    # 0.05 secs
   # system.time({ speech_dtm_idf = speech %>% casting_dtm(tfidf=TRUE) })   # 0.07 secs 
 
+## === small pipe-able routine to clean DTMs of empty rows/colms ===
+ nonempty_dtm <- function(dtm){
+
+	# drop empty rows from dtm
+	a100 = apply(dtm, 1, sum); a101 = (a100 == 0)
+		dtm = dtm[!(a101), ]
+
+	# dropempty colms from dtm
+	a200 = apply(dtm, 2, sum); a201 = (a200 == 0)
+		dtm = dtm[, !(a201)]
+
+  return(dtm) }
 
 ### +++ new func to preprocess n prune DTMs +++ ###
 
