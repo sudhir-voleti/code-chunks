@@ -111,25 +111,17 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
  # bigrammed_corpus[1:5,]
 
  ### +++ new func to cast DTMs outta processed corpora +++ ###
-
-casting_dtm <- function(text,    	 # text is raw corpus 
+casting_dtm <- function(text_as_df,    	 # text_as_df is single df colm 
 			tfidf=FALSE,     
 			use.stopwords=TRUE,    # whether to use stopwords at all 
 			additional.stopwords=NULL){    # which additional stopwords to add
 
-  ## basic cleaning exercises. Obviates need for clean_text()
-  text  =  gsub("<.*?>", " ", text)	# drop html junk
-  text = text %>%   	# v cool. mke this part of std cleanup procs in text-an
-    str_to_lower %>% # make text lower case
-    str_replace_all("\\s+", " ")  	 # collapse multiple spaces
-
   ## tokenizing the corpus
-   textdf = data_frame(text)
-   textdf1 = textdf %>%
-    mutate(docID = row_number()) %>%    # row_number() is v useful.
-    group_by(docID) %>%
-    unnest_tokens(word, text) %>%
-    count(word, sort = TRUE) %>% ungroup()
+   textdf1 = text_as_df %>% 
+     mutate(docID = row_number()) %>%    # row_number() is v useful.    
+     group_by(docID) %>%
+     unnest_tokens(word, text) %>%
+     count(word, sort = TRUE) %>% ungroup()
 
   ## make stop.words list
    stop.words = data.frame(word = as.character(unique(c(additional.stopwords, stop_words$word))),
@@ -145,20 +137,19 @@ casting_dtm <- function(text,    	 # text is raw corpus
 		rename(value = tf_idf)} else { textdf2 = textdf1 %>% rename(value = n)  }
 
   m <- textdf2 %>% cast_sparse(docID, word, value)
-  #  class(m)
 
   # reorder dtm to have sorted rows by doc_num and cols by colsums	
   m = m[order(as.numeric(rownames(m))),]    # reorder rows	
   b0 = apply(m, 2, sum) %>% order(decreasing = TRUE)
   m = m[, b0]
 
-  return(m) }  # func casting_dtm() ends
+  return(m) }    # func ends
 
  # testing the func
-  # speech = readLines('https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/PM%20speech%202014.txt')
-  # system.time({ speech_dtm_tf = speech %>% casting_dtm() })    # 0.05 secs
-  # system.time({ speech_dtm_idf = speech %>% casting_dtm(tfidf=TRUE) })   # 0.07 secs 
-
+ # mydata = readLines('https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/Technolgy%20pitches%20from%20kickstarter.txt')
+ # Piping a workflow based on 4 sourced funcs
+ # my_dtm = mydata %>% clean_text(lower=TRUE) %>% replace_bigram(min_freq=2) %>% select(text) %>% casting_dtm(tfidf=FALSE)
+  
 ## === small pipe-able routine to clean DTMs of empty rows/colms ===
  nonempty_dtm <- function(dtm){
 
