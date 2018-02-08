@@ -110,6 +110,33 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
  # system.time({ bigrammed_corpus = replace_bigram(speech, min_freq = 2) }) # 0.66 secs
  # bigrammed_corpus[1:5,]
 
+## +++ writing an iterated version of above for efficiency since it doesn't scale linearly with corpus size
+ iterated_bigram_replace <- function(raw_corpus, bite_size=100, min_freq=3){
+
+  # build iterator sequence
+  file.seq = seq(from=1, to=length(raw_corpus), by=bite_size) 
+    if (max(file.seq) < length(raw_corpus)) { file.seq[length(file.seq)] = length(raw_corpus)}
+    file.seq
+  
+  # build and populate list
+  n1 = length(file.seq)
+  out_list = vector(mode="list", length=n1)
+  for (i1 in 1:(n1-1))  {
+	start = file.seq[i1]; stop = file.seq[i1+1]-1
+	out_list[[i1]] = raw_corpus[start:stop]}
+
+  out_list[[n1]] =  raw_corpus[file.seq[n1-1]:file.seq[n1]]
+
+  out_list1 = lapply(out_list, function(x) replace_bigram(x, min_freq = min_freq))  
+
+  out_corpus = bind_rows(out_list1)
+
+  return(out_corpus) }    # func ends
+
+ # testing on large iterated corpus for efficiency gains
+ # bd.2009 = readRDS("C:\\Users\\20052\\Dropbox\\teaching related\\Data An for FPM 2018\\session 9 topic modeling\\bd.df.2009.Rds")		     
+ # system.time({ out_corpus = iterated_bigram_replace(bd.2009$bd.text) })    # < 50 secs for 1 year full corpus. O(n+).
+
  ### +++ new func to cast DTMs outta processed corpora +++ ###
 casting_dtm <- function(text_as_df,    	 # text_as_df is single df colm 
 			tfidf=FALSE,     
