@@ -21,8 +21,8 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
   return(text) } # clean_text() ends
 
 # +++
-## == brew fast func to build bigrams.
- replace_bigram <- function(corpus, min_freq = 2){  # corpus has 1 unnamed character colm
+## == brew efficient func to build bigrams (and upto trigrams).
+  replace_bigram <- function(corpus, min_freq = 2){  # corpus has 1 unnamed character colm
 
  library(tidyverse)
  library(tidytext)
@@ -41,7 +41,7 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
   a0 = textdf %>% 	
 	 # bigram-tokenize, count and filter by freq
 	 unnest_tokens(ngram, text, token = "ngrams", n = 2) 
-   a0
+   head(a0)
 
    # creating frequent bigrams for replacement
    a1 = a0 %>% 
@@ -60,33 +60,45 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
   a2 = left_join(a0, a1, by=c("ngram" = "ngram")) %>%
 	 separate(ngram, c("word1", "word2"), sep=" ", remove=FALSE) %>%
 	 dplyr::select(-ngram) # %>% mutate(out_colm = bigram1)
-  a2
+  head(a2)
 
-  # using colm-logicals to solve repeats wala problem
+  ## using logical colms to solve repeats wala problem
   a400 = (is.na(a2$bigram1))
-    a400a = which(!a400)   # orig bigram locations
+    # a400a = which(!a400)   # orig bigram locations
     a2$bigram1[a400] = a2$word1[a400]
-    a2
+  head(a2)
   
-  a401 = which(!a400)  
+  a401 = which(!a400)  # orig bigram locations
   a402 = a401 + 1
 	if (max(a402) > nrow(a2)) { a402[length(a402)] = nrow(a2) }
 
-  a403 = (a2$docID[a401] == a2$docID[a402])   # is bigram inside the document (or at its boundary)?
+  a403 = (a2$docID[a401] == a2$docID[a402])   # is bigram inside the document vs at its boundary?
 
   # what if there are consecutive bigrams?  
-  a403a = (a403)*(!(a402 %in% a401))  
+  a403a = (a403)*(!(a402 %in% a401))  # bigrams are inside docs and NOT consecutive
 
   a404 = a402*a403a
   a405 = a404[(a404 > 0)]  # these are the extra terms or repeats to be dropped.
 
   a2$bigram1[a405] = ""
 
+  # use logical-colms to solve token-repeats in consecutive bigrams
+  a403b = (a403)*(a402 %in% a401)  # consec bigrams inside docs, logical colm
+  a404b = a402*a403b       
+  a405b = a404b[(a404b > 0)]    # row_nums of consec, inside bigrams
+ 
+	# subroutine to drop middle-wala repeating token
+	a405c = a405b -1    # first bigram ka location
+	newgram = a2$bigram1
+	newgram[a405c] = paste(a2$word1[a405c], a2$word1[a405b], a2$word1[a405b+1], sep="_")
+	newgram[a405b] = ""
+	a2$bigram1 = newgram
+
   # using colm-logicals to solve last-word-dropoff wala problem
   a500 = a2$docID
     a501 = c(a500[2:length(a500)], a500[length(a500)])	
     a502 = which(a500 != a501)    # docID boundaries
-    a503 = !(a502 %in% a400a)   # these are the ones to insert
+    a503 = !(a502 %in% a401)   # these are the ones to insert
     a503a = a502[a503]    
 
     a2$bigram1[a503a] = paste(a2$bigram1[a503a], a2$word2[a503a])
@@ -107,7 +119,7 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
 
  # testing above on speech data
  # speech = readLines('https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/PM%20speech%202014.txt')
- # system.time({ bigrammed_corpus = replace_bigram(speech, min_freq = 2) }) # 0.66 secs
+ # system.time({ bigrammed_corpus = replace_bigram(speech, min_freq = 2) }) # 0.09 secs
  # bigrammed_corpus[1:5,]
 
 ## +++ writing an iterated version of above for efficiency since it doesn't scale linearly with corpus size
