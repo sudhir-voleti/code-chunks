@@ -19,6 +19,28 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
 
   return(text) } # clean_text() ends
 
+# sentence-tokenizing routine (coz tidytext's sent-tokenizer ain't great)
+py.sent_tokenize = function(text) {
+ 
+  require(reticulate)
+  require(dplyr)
+  nltk = import("nltk")
+  
+  sent_list = vector(mode="list", length=length(text))  
+  counter = 0
+
+  for (i in 1:length(text)){  
+    sents = nltk$tokenize$sent_tokenize(text[i])
+    sent_list[[i]] = data.frame(docID = i, 
+	sentID = counter + seq(1:length(sents)), 
+	text = sents, 
+  	stringsAsFactors=FALSE)
+
+   counter = max(sent_list[[i]]$sentID)   }    # i ends
+
+  sent_df = bind_rows(sent_list)   
+  return(sent_df)  }   # func ends
+
 ### Func 1: write an R func to POSTag with py
 py.postag <- function(text){
 	
