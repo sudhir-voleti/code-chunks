@@ -19,8 +19,131 @@ clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
     str_replace_all("\\\\s+", " ")  
 
   return(text) } # clean_text() ends
-
 # +++
+
+# +++ below is workflow to keyword filter a corpus, as follows: 
+# py.sent_tokenize() %in% keyword_filt_corpus() %in% iterated_keyword_filt()
+## === sentence tokenizing using py
+py.sent_tokenize = function(text) {
+ 
+  require(reticulate)
+  require(dplyr)
+  nltk = import("nltk")
+  
+  sent_list = vector(mode="list", length=length(text))  
+  counter = 0
+
+  for (i in 1:length(text)){  
+    sents = nltk$tokenize$sent_tokenize(text[i])
+    sent_list[[i]] = data.frame(docID = i, 
+	sentID = counter + seq(1:length(sents)), 
+	text = sents, 
+  	stringsAsFactors=FALSE)
+
+ 	counter = max(sent_list[[i]]$sentID)   }    # i ends
+
+  sent_df = bind_rows(sent_list)   
+  return(sent_df)  }   # func ends
+
+## +++
+# keyword filtering a corpus - efficient implementation (sentence based). Needs py!
+ keyword_filter_corpus <- function(raw_corpus, wordlist=NULL, half.window.size=1){
+
+  library(tidyverse)
+  library(tidytext)
+
+  # first, sentence tokenize the corpus
+  sent_df = py.sent_tokenize(raw_corpus)  # colms are {docID, sentID, text (of sentences)}
+  
+  # routine to pre-process wordlist
+  if (is.null(wordlist)) {print("Enter valid wordlist"); stop}
+  wlist_df = wordlist %>% data_frame() %>% rename("word" = ".") %>% unique() %>% mutate(wlist = word)
+    wlist_df
+	
+  # word-tokenize corpus by sentence & merge with wlist_df
+  corpus_df = sent_df %>% unnest_tokens(word, text) 
+  corpus_df1 = left_join(corpus_df, wlist_df, by=c("word" = "word"))  
+
+  # Use logical-colms to ID sentences for extraction.
+  a100 = which(!(is.na(corpus_df1$wlist)))    # row_nums of keywords found
+  a101 = corpus_df[a100,] %>% select(docID, sentID) 
+
+    a102 = a101 %>% select(sentID) %>% unique()   # unique sentences containing keywords
+    a102e = a102$sentID
+    a102a = a102e + half.window.size    
+    a102b = a102e - half.window.size
+
+      # boundary exception handling
+      if (max(a102a) > max(corpus_df$sentID)) {a102a[length(a102a)] = max(corpus_df$sentID)}
+      if (min(a102b) ==0) {a102b[1] = 1}
+
+    a102c = unique(c(a102a, a102e, a102b))   # superset of all sentences to ID
+    a102d = order(a102c)   # index of ordered a102c elements
+    a102c = a102c[a102d]
+
+    # find doc boundaries
+    a103a = corpus_df$docID
+    a103b = c(a103a[2:length(a103a)], a103a[length(a103a)])	
+    a103 = which(!(a103a == a103b))    # row_nums representing doc boundaries
+    
+    a104 = corpus_df$sentID[a103]+1    # sentences right after doc boundaries. 
+    
+   # sentences to extract
+   a105 = which(!(a102c %in% a104))
+   a106 = a102c[a105]
+     a106a = order(a106)
+     a106 = a106[a106a]    # list of sentences to extract
+
+  # build list to store extracted sents doc-wise
+  sent_df1 = sent_df[a106,]
+  a107 = unique(sent_df1$docID)  
+    out_list = vector(mode="list", length=length(a107))
+    # out_df = data.frame(docID = numeric(), filt.text = character(), stringsAsFactors=FALSE)
+    counter = 0
+    for (i in a107){ 
+        counter = counter+1
+	b100 = sent_df1[sent_df1$docID == i,] 
+	b101 = str_c(b100$text, collapse=" ")
+	out_list[[counter]] = data.frame(docID = i, filt.text = b101, stringsAsFactors=FALSE)
+	} # i ends
+      
+  out_df = bind_rows(out_list)
+
+  return(out_df)  }   # keyword_filter_corpus() func ends
+
+ # testing keyword_filter_corpus() func
+ # wordlist = c("service", "services", "solution", "solutions", "subscription", "subscribe", "utility", "API", "cloud",
+ #		"consult", "consulting", "consultancy")
+ # raw_corpus = readRDS("https://www.dropbox.com/s/0tjaigyudgwtn4w/bd.df.2009.Rds?dl=0")
+ # system.time({ out_df = keyword_filter_corpus(raw_corpus[1:100], wordlist) })    # 1.44 secs for 100 RF docs
+
+ ## code an iterated version of above and test
+ iterated_keyword_filt <- function(raw_corpus, wordlist=NULL, bite.size=100, half.window.size=1){
+
+  # build iterator sequence
+  file.seq = seq(from=1, to=length(raw_corpus), by=bite_size) 
+    if (max(file.seq) < length(raw_corpus)) { file.seq[length(file.seq)] = length(raw_corpus)}
+    file.seq
+  
+  # build and populate list
+  n1 = length(file.seq)
+  out_list = vector(mode="list", length=n1)
+  for (i1 in 1:(n1-1))  {
+	start = file.seq[i1]; stop = file.seq[i1+1]-1
+	out_list[[i1]] = raw_corpus[start:stop]}
+
+  out_list[[n1]] =  raw_corpus[file.seq[n1-1]:file.seq[n1]]
+
+  out_list1 = lapply(out_list, function(x) keyword_filter_corpus(x, wordlist=wordlist, half.window.size=half.window.size))  
+
+  out_corpus = bind_rows(out_list1)
+
+  return(out_corpus) }   # iterated_keyword_filt() func ends
+ 
+  # testing above for 1 year full BD corpus
+  # system.time({ out_corpus = iterated_keyword_filt(bd.2009$bd.text, wordlist)})    # 16.65 secs for full corpus! Almost linear scaling.
+
+		     
 ## == brew efficient func to build bigrams (and upto trigrams).
   replace_bigram <- function(corpus, min_freq = 2){  # corpus has 1 unnamed character colm
 
