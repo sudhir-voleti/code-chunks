@@ -47,7 +47,7 @@ py.sent_tokenize = function(text) {
 
 ## +++
 # keyword filtering a corpus - efficient implementation (sentence based). Needs py!
- keyword_filter_corpus <- function(raw_corpus, wordlist=NULL, half.window.size=1){
+keyword_filter_corpus <- function(raw_corpus, wordlist=NULL, half.window.size=1, delimiter=" "){
 
   library(tidyverse)
   library(tidytext)
@@ -67,19 +67,20 @@ py.sent_tokenize = function(text) {
   # Use logical-colms to ID sentences for extraction.
   a100 = which(!(is.na(corpus_df1$wlist)))    # row_nums of keywords found
   a101 = corpus_df[a100,] %>% select(docID, sentID) 
+  a101 %>% head()
 
     a102 = a101 %>% select(sentID) %>% unique()   # unique sentences containing keywords
-    a102e = a102$sentID
-    a102a = a102e + half.window.size    
-    a102b = a102e - half.window.size
+    a102e = a102$sentID   # focal sentence with keyword in it
+    a102a = a102e + half.window.size    # sentences following the focal keyword
+    a102b = a102e - half.window.size    # sentences preceding the focal keyword
 
       # boundary exception handling
       if (max(a102a) > max(corpus_df$sentID)) {a102a[length(a102a)] = max(corpus_df$sentID)}
       if (min(a102b) ==0) {a102b[1] = 1}
 
-    a102c = unique(c(a102a, a102e, a102b))   # superset of all sentences to ID
-    a102d = order(a102c)   # index of ordered a102c elements
-    a102c = a102c[a102d]
+    a102x = data.frame(start=a102b, stop=a102a); head(a102x)      
+    a102c = apply(a102x, 1, function(x) {seq(from=x[1], to=x[2])}) %>% unlist() %>% unique()	# unique superset of all sentences to ID         
+    a102c = a102c[order(a102c)]  # vector of ordered a102c elements
 
     # find doc boundaries
     a103a = corpus_df$docID
@@ -103,7 +104,7 @@ py.sent_tokenize = function(text) {
     for (i in a107){ 
         counter = counter+1
 	b100 = sent_df1[sent_df1$docID == i,] 
-	b101 = str_c(b100$text, collapse=" ")
+	b101 = str_c(b100$text, collapse=delimiter)
 	out_list[[counter]] = data.frame(docID = i, filt.text = b101, stringsAsFactors=FALSE)
 	} # i ends
       
@@ -114,8 +115,8 @@ py.sent_tokenize = function(text) {
  # testing keyword_filter_corpus() func
  # wordlist = c("service", "services", "solution", "solutions", "subscription", "subscribe", "utility", "API", "cloud",
  #		"consult", "consulting", "consultancy")
- # raw_corpus = readRDS("https://www.dropbox.com/s/0tjaigyudgwtn4w/bd.df.2009.Rds?dl=0")
- # system.time({ out_df = keyword_filter_corpus(raw_corpus[1:100], wordlist) })    # 1.44 secs for 100 RF docs
+ # raw_corpus = readRDS("C:\\Users\\20052\\Dropbox\\teaching related\\Data An for FPM 2018\\session 9 topic modeling\\bd.df.2009.Rds")
+ # system.time({ out_df = keyword_filter_corpus(raw_corpus[1:100], wordlist, half.window.size=2, delimiter="+++") })    # 1.47 secs for 100 RF docs
 
  ## code an iterated version of above and test
  iterated_keyword_filt <- function(raw_corpus, wordlist=NULL, bite.size=100, half.window.size=1){
