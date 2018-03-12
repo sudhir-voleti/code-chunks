@@ -367,6 +367,16 @@ preprocess_dtm <- function(dtm, min_occur = 0.01, max_occur = 0.50){
 # example try
 # system.time({ nokia_dtm_processed = preprocess_dtm(nokia_dtm) })    # 1.48 secs
 # dim(nokia_dtm_processed)
+
+# === stand-alone func to convert dtm directly to tfidf
+dtm_to_tfidf <- function(dtm){  # ideally in dgCMatrix form
+  require(text2vec)
+  require(Matrix)	
+     if (class(dtm) != "dgCMatrix") {dtm = Matrix(dtm, sparse=TRUE)}	
+	
+  model_tfidf = TfIdf$new()
+  dtm_tfidf = model_tfidf$fit_transform(dtm)	
+ return(dtm_tfidf)}
 	     
 ## === func to merge DTMs (needed when iterating) === ##
 merge_dtm <- function(dtm1, dtm2){
