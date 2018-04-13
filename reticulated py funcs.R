@@ -237,7 +237,7 @@ entity_list_doc <- function(doc_df){
 
       
 ## build wrapper func around entity_list_doc() entity extractor  
-extract_entity <- function(corpus, 
+extract_entity <- function(text_df,   # annotated df with ner=TRUE 
                            entity = "PERSON"){    # Alternately, "ORGANIZATION", "GPE"  
   
   require(tidyverse)
