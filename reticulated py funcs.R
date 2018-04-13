@@ -1,9 +1,12 @@
 # NLP functions from py in R using reticulate
 
-try(require(reticulate)|| install.packages("reticulate"))
+if(!require(reticulate)) {install.packages("reticulate")}
 library(reticulate) 
 library(stringr)
 require(tidyverse)
+
+penn_treebank = read.csv('https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/penn_treebank.csv', 
+                           header=TRUE)
 
 # defining a purely clean_text op
 clean_text <- function(text, lower=FALSE, alphanum=FALSE, drop_num=FALSE){
@@ -86,9 +89,9 @@ py.ner <- function(text){
 # Func 3: merge penn_treebank desc onto the outp df 
 # https://www.ling.upenn.edu/courses/Fall_2003/ling001/penn_treebank_pos.html
 
-postag_desc <- function(postag_df){  
+postag_desc <- function(postag_df, penn_treebank){  
   
-  penn_treebank = read.csv('https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/penn_treebank.csv', 
+  # penn_treebank = read.csv('https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/penn_treebank.csv', 
                            header=TRUE)
   
   penn_treebank = penn_treebank[,-1]
@@ -135,7 +138,7 @@ py.annotate <- function(corpus, ner = FALSE){
   
   for (doc in 1:length(text_list)){ text_list[[doc]]$doc_num = doc    }
   text_df = bind_rows(text_list)
-  text_annotated_df = text_df %>% postag_desc()
+  text_annotated_df = text_df %>% postag_desc(penn_treebank)
   
   return(text_annotated_df) }    # py.annotate() func ends
 
