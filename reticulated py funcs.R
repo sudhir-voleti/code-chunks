@@ -91,9 +91,6 @@ py.ner <- function(text){
 
 postag_desc <- function(postag_df, penn_treebank){  
   
-  # penn_treebank = read.csv('https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/penn_treebank.csv', 
-                           # header=TRUE)
-  
   penn_treebank = penn_treebank[,-1]
   
   b0 = merge(postag_df, penn_treebank,
