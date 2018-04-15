@@ -90,8 +90,47 @@ dtm_build <- function(raw_corpus, tfidf=FALSE)
   return(dtm1)  }   # func ends
 
 # testing func 2 on ibm data
-# system.time({ dtm_ibm_tf = dtm_build(ibm) })    # 0.02 secs
+# system.time({ dtm_ibm_tf = ibm %>% text.clean(., remove_numbers=FALSE) %>% 
+#                            dtm_build(.) })    # 0.02 secs
 
+# +++
+# func to streamline DTM size by dropping tokens occurring too rarely or frequently
+streamline_dtm <- function(dtm,  # takes dtm as input
+			min_occur=0.05,   # if token occurs in <5% of docs, drop it
+			max_occur=0.95)   # if token occurs in >95% of docs, drop it
+{
+
+  # drop tokens failing a min or max doc_occurrence threshold
+  a0 = apply(dtm, 2, function(x) ifelse(x>0, 1, 0))
+  a1 = apply(a0, 2, sum);    summary(a1)
+  min_thresh = min_occur*nrow(dtm)    # drop if token occurs in < 1% of docs
+  a2 = (a1 > min_thresh)
+  a2_dtm = dtm[, a2];    # dim(a2_dtm)
+  
+  max_thresh = max_occur*nrow(dtm)     # drop if token occurs in > 99% of docs 
+  a1 = apply(a2_dtm, 2, sum)
+  a3 = (a1 <= max_thresh)
+  a3_dtm = a2_dtm[, a3];    # dim(a3_dtm) 
+
+  # drop empty rows after token set reduction. 
+  a100 = apply(a3_dtm, 1, sum)
+  a101.logical = (a100 > 0)
+  a4_dtm = a3_dtm[a101.logical,]
+
+  # reorder rownames
+  a0 = order(as.numeric(rownames(a4_dtm)))
+  a4_dtm = a4_dtm[a0,]          
+  # rm(a0, a1, a2, a3, a2_dtm)
+
+  return(a4_dtm)    # pre-processed dtm output
+  }  # streamline_dtm() func ends
+
+# test-driving above func on ibm data
+# system.time({ ibm_dtm_streamlined = ibm %>% 
+#                                      text.clean(., remove_numbers=FALSE) %>% 
+#                                      dtm_build(.) %>% 
+#                                      streamline_dtm(., min_occur=0.01, max_occur=0.80) })    # 0.42 secs
+             
 # +++
 
 build_wordcloud <- function(dtm, 
@@ -132,7 +171,7 @@ build_wordcloud <- function(dtm,
 } # func ends
 
 # test-driving func 3 via IBM data
-# system.time({ build_wordcloud(dtm_ibm_tf, plot.title="IBM TF wordlcoud") })    # 0.4 secs
+# system.time({ build_wordcloud(ibm_dtm_streamlined, plot.title="IBM TF wordlcoud") })    # 0.4 secs
 
 # +++
 
@@ -155,7 +194,7 @@ plot.barchart <- function(dtm, num_tokens=15, fill_color="Blue")
   plot(p) }  # func ends
 
 # testing above func
-# system.time({ plot.barchart(dtm_ibm_tf) })    # 0.1 secs
+# system.time({ plot.barchart(ibm_dtm_streamlined) })    # 0.1 secs
 
 # +++
 
@@ -213,7 +252,7 @@ distill.cog = function(dtm, # input dtm
 } # distill.cog func ends
 
 # testing COG on ibm data
-# system.time({ distill.cog(dtm_ibm_tf, "COG for IBM TF") })    # 0.27 secs
+# system.time({ distill.cog(ibm_dtm_streamlined, "COG for IBM TF") })    # 0.27 secs
 
 # +++
 
