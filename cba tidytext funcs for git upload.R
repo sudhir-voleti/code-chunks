@@ -319,4 +319,81 @@ build_cog_ggraph <- function(corpus,   # text colmn only
 
 # +++
 
+## === func 2 build cog_ggraph from dtm directly ===
+dtm.2.ggraph <- function(dtm, 
+			max_tokens = 30,
+			max_edges = 150, 
+                        drop.stop_words=TRUE,
+                        new.stopwords=NULL)
+{    # func opens
+ require(tidyverse)
+ require(tidytext)
+
+# remove stopwords from dtm
+ stop.words1 = c(tidytext::stop_words$word, new.stopwords);    # length(stop.words1) 
+ logi.vec1 = (colnames(dtm) %in% stop.words1);   #  logi.vec1 %>% head();    sum(logi.vec1)
+ if (sum(logi.vec1) >0) {dtm = dtm[, !(logi.vec1)]}  # drop DTM colmns which are stopwords
+
+# choose a sample of say top max_tokens words that remain and continue
+ dtm.col.sum = apply(dtm, 2, sum)
+   a0 = sort(dtm.col.sum, decreasing=TRUE, index.return=TRUE)
+   dtm = dtm[,(a0$ix[1:max_tokens])];  #  dim(nokia_dtm2)
+   dtm = as.matrix(dtm)
+   tt.mat = t(dtm) %*% dtm;  #  dim(tt.mat)
+
+# build word-pair type df now based on tt.mat lower triangular
+ diag(tt.mat) = 0
+ n = ncol(tt.mat); n1 = n*(n-1)/2
+ word_pairs = data.frame(item1=character(n1), item2=character(n1), n=numeric(n1), stringsAsFactors=FALSE)
+
+ i0 = 0
+ for (i1 in 1:(n-1)){
+   for (i2 in (i1+1):n){
+
+	i0 = i0+1
+	word_pairs$item1[i0] = colnames(tt.mat)[i1]
+	word_pairs$item2[i0] = rownames(tt.mat)[i2]
+	word_pairs$n[i0] = tt.mat[i2, i1]
+
+	}}
+
+# Insert wordfreq as new colmn to word_pairs
+ dtm.col.sum = apply(dtm, 2, sum) 
+   word_counts = data.frame(word=colnames(dtm), wordfr = dtm.col.sum, stringsAsFactors=FALSE)
+   word_pairs = word_pairs %>% left_join(word_counts, by = c("item1" = "word"))
+   row_thresh = min(nrow(word_pairs), max_edges)
+
+# now plot
+  set.seed(1234)
+  # windows()
+  plot_d <- word_pairs %>% 
+	    filter(n >= 3) %>%
+	    top_n(row_thresh) %>%   igraph::graph_from_data_frame() # graph object built!
+
+  dfwordcloud = data_frame(vertices = names(V(plot_d))) %>% 
+		left_join(word_counts, by = c("vertices"= "word"))
+
+ # build ggraph now
+  plot_obj = plot_d %>%   
+	    ggraph(layout = "fr") +
+	    geom_edge_link(aes(edge_alpha = n, edge_width = n), edge_colour = "cyan4")  +
+	    # geom_node_point(size = 5) +
+	    geom_node_point(size = log(dfwordcloud$wordfr)) +
+	    geom_node_text(aes(label = name), repel = TRUE, 
+                   point.padding = unit(0.2, "lines"),
+                   size = 1 + log(dfwordcloud$wordfr)) +
+	    theme_void()
+
+ return(plot_obj) 
+
+ } # dtm.2.ggraph() func ends
+
+ # check with sample dataset
+ # ibm = readLines("https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/International%20Business%20Machines%20(IBM)%20Q3%202016%20Results%20-%20Earnings%20Call%20Transcript.txt")
+ # source("https://raw.githubusercontent.com/sudhir-voleti/code-chunks/master/cba%20tidytext%20funcs%20for%20git%20upload.R")
+ # dtm.ibm = ibm %>% 
+ #		text.clean(., remove_numbers=FALSE) %>% 
+ #		dtm_build(.) %>% 
+ #		streamline_dtm(., min_occur=0.01, max_occur=0.80)
+ #  dtm.2.ggraph(dtm.ibm, max_tokens=50)	
 
