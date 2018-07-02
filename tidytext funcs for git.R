@@ -582,7 +582,7 @@ build_cog_ggraph <- function(corpus,   # text colmn only
   dfwordcloud = data_frame(vertices = names(V(plot_d))) %>% left_join(word_counts, by = c("vertices"= "word"))
   
   plot_obj = plot_d %>%   # graph object built!
-    
+	
     ggraph(layout = "fr") +
     geom_edge_link(aes(edge_alpha = n, edge_width = n), edge_colour = "cyan4")  +
     # geom_node_point(size = 5) +
@@ -611,6 +611,8 @@ dtm.2.ggraph <- function(dtm,
  require(tidyverse)
  require(tidytext)
 
+ dtm = as.matrix(dtm)	
+	
 # elim stopwords from dtm
  stop.words1 = c(tidytext::stop_words$word, new.stopwords);    # length(stop.words1) 
  logi.vec1 = (colnames(dtm) %in% stop.words1);   #  logi.vec1 %>% head();    sum(logi.vec1)
