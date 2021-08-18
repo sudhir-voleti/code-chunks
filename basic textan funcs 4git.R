@@ -128,6 +128,47 @@ dtm.tcm.creator <- function(text,
   return(out)
 }
 
+### +++ tidytext based cast DTM +++ ###
+require(tidytext)
+casting_dtm <- function(text_as_df,    	 # text_as_df is single df colm 
+			tfidf=FALSE,     
+			use.stopwords=TRUE,    # whether to use stopwords at all 
+			additional.stopwords=NULL){    # which additional stopwords to add
+
+  ## tokenizing the corpus
+   textdf1 = text_as_df %>% 
+     mutate(docID = row_number()) %>%    # row_number() is v useful.    
+     group_by(docID) %>%
+     unnest_tokens(word, text) %>%
+     count(word, sort = TRUE) %>% ungroup()
+
+  ## make stop.words list
+   stop.words = data.frame(word = as.character(unique(c(additional.stopwords, stop_words$word))),
+				stringsAsFactors=FALSE)	
+
+    if (use.stopwords == "TRUE"){ textdf1 = textdf1 %>% anti_join(stop.words) }
+
+  ## cast into a Matrix object
+  if (tfidf == "TRUE") {
+	textdf2 = textdf1 %>% group_by(docID) %>% 
+		count(word, sort=TRUE) %>% ungroup() %>%
+		bind_tf_idf(word, docID, nn) %>% 
+		rename(value = tf_idf)} else { textdf2 = textdf1 %>% rename(value = n)  }
+
+  m <- textdf2 %>% cast_sparse(docID, word, value)
+
+  # reorder dtm to have sorted rows by doc_num and cols by colsums	
+  m = m[order(as.numeric(rownames(m))),]    # reorder rows	
+  b0 = apply(m, 2, sum) %>% order(decreasing = TRUE)
+  m = m[, b0]
+
+  return(m) }    # func ends
+
+ # testing the func
+ # mydata = readLines('https://raw.githubusercontent.com/sudhir-voleti/sample-data-sets/master/Technolgy%20pitches%20from%20kickstarter.txt')
+ # Piping a workflow based on 4 sourced funcs
+ # my_dtm = mydata %>% clean_text(lower=TRUE) %>% replace_bigram(min_freq=2) %>% select(text) %>% casting_dtm(tfidf=FALSE)
+
 #=================================
 # func 3 is wordcloud builder
 #=================================
