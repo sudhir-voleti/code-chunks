@@ -280,7 +280,7 @@ casting_dtm <- function(text_as_df,    	 # text_as_df is single df colm
 			additional.stopwords=NULL){    # which additional stopwords to add
 
   ## tokenizing the corpus
-   textdf1 = text_as_df %>% 
+   textdf1 = text_as_df %>% tibble() %>%
      mutate(docID = row_number()) %>%    # row_number() is v useful.    
      group_by(docID) %>%
      unnest_tokens(word, text) %>%
